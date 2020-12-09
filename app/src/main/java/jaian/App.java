@@ -4,11 +4,18 @@
 package jaian;
 
 public class App {
-    public String getGreeting() {
-        return "Hello World!";
-    }
+    private String arg;
 
     public static void main(String[] args) {
-        System.out.println(new App().getGreeting());
+        if (args.length != 1) {
+            System.err.println("引数の個数が正しくありません");
+            System.exit(1);
+        }
+
+        System.out.printf(".intel_syntax noprefix\n");
+        System.out.printf(".globl main\n");
+        System.out.printf("main:\n");
+        System.out.printf("    mov rax, %d\n", Integer.parseInt(args[0]));
+        System.out.printf("    ret\n");
     }
 }
