@@ -4,18 +4,49 @@
 package jaian;
 
 public class App {
-    private String arg;
-
     public static void main(String[] args) {
         if (args.length != 1) {
-            System.err.println("引数の個数が正しくありません");
+            System.err.println("Invalid arguments.");
             System.exit(1);
+        }
+
+        String src = args[0];
+
+        String first = "0";
+        int idx = 0;
+        for (; idx < src.length(); ++idx) {
+            if (Character.isDigit(src.charAt(idx))) {
+                int begin = idx;
+                while (++idx < src.length() && Character.isDigit(src.charAt(idx)));
+                first = src.substring(begin, idx);
+                break;
+            }
         }
 
         System.out.printf(".intel_syntax noprefix\n");
         System.out.printf(".globl main\n");
         System.out.printf("main:\n");
-        System.out.printf("    mov rax, %d\n", Integer.parseInt(args[0]));
+        System.out.printf("    mov rax, %s\n", first);
+
+        for (; idx < src.length(); ++idx) {
+            if (src.charAt(idx) == '+') {
+                int begin = ++idx;
+                while (idx+1 < src.length() && Character.isDigit(src.charAt(idx+1))) { ++idx; };
+                System.out.printf("    add rax, %s\n", src.substring(begin, idx+1));
+                continue;
+            }
+
+            if (src.charAt(idx) == '-') {
+                int begin = ++idx;
+                while (idx+1 < src.length() && Character.isDigit(src.charAt(idx+1))) { ++idx; };
+                System.out.printf("    sub rax, %s\n", src.substring(begin, idx+1));
+                continue;
+            }
+
+            System.err.printf("Unexpected character: '%c'\n", src.charAt(idx));
+        }
+
         System.out.printf("    ret\n");
     }
 }
+

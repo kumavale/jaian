@@ -25,11 +25,15 @@ function assert() {
 
 # Build
 gradle assemble
+if [ "$?" -ne "0" ]; then
+    exit 1
+fi
 echo
 
 # Tests
 assert  0 '0'
 assert 42 '42'
+assert 21 '5+20-4'
 
 # Clean
 rm -f tmp tmp.s
