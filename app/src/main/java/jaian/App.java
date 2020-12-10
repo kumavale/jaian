@@ -12,32 +12,23 @@ public class App {
             System.exit(1);
         }
 
+        // トークナイズしてパースする
         String src = args[0];
-        // トークナイズする
         token = Token.tokenize(src);
+        Node node = expr();
 
         // アセンブリの前半部分を出力
-        System.out.printf(".intel_syntax noprefix\n");
-        System.out.printf(".globl main\n");
-        System.out.printf("main:\n");
+        System.out.println(".intel_syntax noprefix");
+        System.out.println(".globl main");
+        System.out.println("main:");
 
-        // 式の最初は数でなければならないので、それをチェックして
-        // 最初のmov命令を出力
-        System.out.printf("    mov rax, %d\n", expect_number());
+        // 抽象構文木を下りながらコード生成
+        gen(node);
 
-        // `+ <num>` か `- <num>` というトークンの並びを消費しつつ
-        // アセンブリを出力
-        while (!token.at_eof()) {
-            if (consume('+')) {
-                System.out.printf("    add rax, %d\n", expect_number());
-                continue;
-            }
-
-            expect('-');
-            System.out.printf("    sub rax, %d\n", expect_number());
-        }
-
-        System.out.printf("    ret\n");
+        // スタックトップに式全体の値が残っているので
+        // それをRAXにロードして関数からの返り値とする
+        System.out.println("    pop rax");
+        System.out.println("    ret");
     }
 
     /** エラーを出力して終了 */
@@ -90,6 +81,81 @@ public class App {
         int val = token.val();
         token = token.next();
         return val;
+    }
+
+    // expr = mul ('+' mul | '-' mul)*
+    private static Node expr() {
+        Node node = mul();
+
+        while (true) {
+            if (consume('+')) {
+                node = Node.new_node(NodeKind.Add, node, mul());
+            } else if (consume('-')) {
+                node = Node.new_node(NodeKind.Sub, node, mul());
+            } else {
+                return node;
+            }
+        }
+    }
+
+    // mul = primary ('*' primary | '/' primary)*
+    private static Node mul() {
+        Node node = primary();
+
+        while (true) {
+            if (consume('*')) {
+                node = Node.new_node(NodeKind.Mul, node, primary());
+            } else if (consume('/')) {
+                node = Node.new_node(NodeKind.Div, node, primary());
+            } else {
+                return node;
+            }
+        }
+    }
+
+    // primary = '(' expr ')' | num
+    private static Node primary() {
+        // 次のトークンが '(' なら、 '(' expr ')' のはず
+        if (consume('(')) {
+            Node node = expr();
+            expect(')');
+            return node;
+        }
+
+        // そうでなければ数値のはず
+        return Node.new_node_num(expect_number());
+    }
+
+    /** コード生成 */
+    private static void gen(Node node) {
+        if (node.kind() == NodeKind.Num) {
+            System.out.printf("    push %d\n", node.val());
+            return;
+        }
+
+        gen(node.lhs());
+        gen(node.rhs());
+
+        System.out.println("    pop rdi");
+        System.out.println("    pop rax");
+
+        switch (node.kind()) {
+            case Add:
+                System.out.println("    add rax, rdi");
+                break;
+            case Sub:
+                System.out.println("    sub rax, rdi");
+                break;
+            case Mul:
+                System.out.println("    imul rax, rdi");
+                break;
+            case Div:
+                System.out.println("    cqo");
+                System.out.println("    idiv rdi");
+                break;
+        }
+
+        System.out.println("    push rax");
     }
 }
 

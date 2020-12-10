@@ -23,7 +23,7 @@ public class Token {
                 continue;
             }
 
-            if (ch == '+' || ch == '-') {
+            if ("+-*/()".indexOf(ch) != -1) {
                 cur = new_token(TokenKind.Reserved, cur, idx);
                 continue;
             }
