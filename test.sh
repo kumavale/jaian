@@ -8,7 +8,7 @@ function assert() {
     expected="$1"
     input="$2"
 
-    gradle run -q --args="$input" > tmp.s
+    gradle run -q --args="'$input'" > tmp.s
     cc -o tmp tmp.s
     ./tmp
     actual="$?"
@@ -34,6 +34,7 @@ echo
 assert  0 '0'
 assert 42 '42'
 assert 21 '5+20-4'
+assert 41 ' 12 + 34 - 5 '
 
 # Clean
 rm -f tmp tmp.s

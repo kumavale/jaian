@@ -4,6 +4,8 @@
 package jaian;
 
 public class App {
+    private static Token token;
+
     public static void main(String[] args) {
         if (args.length != 1) {
             System.err.println("Invalid arguments.");
@@ -11,42 +13,74 @@ public class App {
         }
 
         String src = args[0];
+        // トークナイズする
+        token = Token.tokenize(src);
 
-        String first = "0";
-        int idx = 0;
-        for (; idx < src.length(); ++idx) {
-            if (Character.isDigit(src.charAt(idx))) {
-                int begin = idx;
-                while (++idx < src.length() && Character.isDigit(src.charAt(idx)));
-                first = src.substring(begin, idx);
-                break;
-            }
-        }
-
+        // アセンブリの前半部分を出力
         System.out.printf(".intel_syntax noprefix\n");
         System.out.printf(".globl main\n");
         System.out.printf("main:\n");
-        System.out.printf("    mov rax, %s\n", first);
 
-        for (; idx < src.length(); ++idx) {
-            if (src.charAt(idx) == '+') {
-                int begin = ++idx;
-                while (idx+1 < src.length() && Character.isDigit(src.charAt(idx+1))) { ++idx; };
-                System.out.printf("    add rax, %s\n", src.substring(begin, idx+1));
+        // 式の最初は数でなければならないので、それをチェックして
+        // 最初のmov命令を出力
+        System.out.printf("    mov rax, %d\n", expect_number());
+
+        // `+ <num>` か `- <num>` というトークンの並びを消費しつつ
+        // アセンブリを出力
+        while (!token.at_eof()) {
+            if (consume('+')) {
+                System.out.printf("    add rax, %d\n", expect_number());
                 continue;
             }
 
-            if (src.charAt(idx) == '-') {
-                int begin = ++idx;
-                while (idx+1 < src.length() && Character.isDigit(src.charAt(idx+1))) { ++idx; };
-                System.out.printf("    sub rax, %s\n", src.substring(begin, idx+1));
-                continue;
-            }
-
-            System.err.printf("Unexpected character: '%c'\n", src.charAt(idx));
+            expect('-');
+            System.out.printf("    sub rax, %d\n", expect_number());
         }
 
         System.out.printf("    ret\n");
+    }
+
+    /** エラーを出力して終了 */
+    // printfと同じ引数を取る
+    public static void error(String fmt, Object... values) {
+        System.err.printf(fmt, values);
+        System.exit(1);
+    }
+
+    /**
+     * 次のトークンが期待している記号の時には、トークンを1つ読み進めてtrueを返す。
+     * それ以外の場合はfalseを返す。
+     */
+    private static boolean consume(char op) {
+        if (token.kind() != TokenKind.Reserved || token.cur(0) != op) {
+            return false;
+        }
+        token = token.next();
+        return true;
+    }
+
+    /**
+     * 次のトークンが期待している記号のときには、トークンを1つ読み進める。
+     * それ以外の場合にはエラーを報告する。
+     */
+    private static void expect(char op) {
+        if (token.kind() != TokenKind.Reserved || token.cur(0) != op) {
+            error("Unexpected character: '%c'", op);
+        }
+        token = token.next();
+    }
+
+    /**
+     * 次のトークンが数値の場合、トークンを1つ読み進めてその数値を返す。
+     * それ以外の場合にはエラーを報告する。
+     */
+    private static int expect_number() {
+        if (token.kind() != TokenKind.Num) {
+            error("Not a number");
+        }
+        int val = token.val();
+        token = token.next();
+        return val;
     }
 }
 
