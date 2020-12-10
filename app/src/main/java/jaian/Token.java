@@ -5,7 +5,7 @@ public class Token {
     private TokenKind kind;     /** トークンの型 */
     private Token next;         /** 次のトークン */
     private int val;            /** kindがNumの場合、その数値 */
-    private int cur;            /** 現在のインデックス */
+    private int idx;            /** 現在のインデックス */
     private static String src;  /** 入力文字列 */
 
     /** Tokenクラスの初期化 */
@@ -48,13 +48,13 @@ public class Token {
         Token tok = new Token();
         tok.kind = kind;
         cur.next = tok;
-        tok.cur = index;
+        tok.idx  = index;
         return tok;
     }
 
     /** 現在のインデックスと引数で渡されたインデックスを合計したインデックスの文字を返す */
     public char cur(int index) {
-        return src.charAt(this.cur + index);
+        return src.charAt(this.idx + index);
     }
 
     /** tokenがEOFかどうか */
@@ -66,6 +66,8 @@ public class Token {
     public TokenKind kind() { return this.kind; }
     public Token next()     { return this.next; }
     public int val()        { return this.val; }
+    public int idx()        { return this.idx; }
+    public String src()     { return this.src; }
 
     /** 空白文字ならtrueを返す */
     private static boolean is_whitespace(char c) {

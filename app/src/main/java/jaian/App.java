@@ -47,6 +47,15 @@ public class App {
         System.exit(1);
     }
 
+    /** エラー位置を出力して終了 */
+    public static void error_at(String fmt, Object... values) {
+        System.err.println(token.src());
+        System.err.printf("%" + token.idx() + "s", "");
+        System.err.printf("^ ");
+        System.err.printf(fmt, values);
+        System.exit(1);
+    }
+
     /**
      * 次のトークンが期待している記号の時には、トークンを1つ読み進めてtrueを返す。
      * それ以外の場合はfalseを返す。
@@ -65,7 +74,7 @@ public class App {
      */
     private static void expect(char op) {
         if (token.kind() != TokenKind.Reserved || token.cur(0) != op) {
-            error("Unexpected character: '%c'", op);
+            error_at("Unexpected character: '%c'", token.cur(0));
         }
         token = token.next();
     }
@@ -76,7 +85,7 @@ public class App {
      */
     private static int expect_number() {
         if (token.kind() != TokenKind.Num) {
-            error("Not a number");
+            error_at("Not a number");
         }
         int val = token.val();
         token = token.next();
