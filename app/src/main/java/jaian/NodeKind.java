@@ -6,6 +6,10 @@ public enum NodeKind {
     Sub,  /** - */
     Mul,  /** * */
     Div,  /** / */
+    Eq,   /** == */
+    Ne,   /** != */
+    Lt,   /** < */
+    Le,   /** <= */
     Num,  /** 整数 */
 }
 

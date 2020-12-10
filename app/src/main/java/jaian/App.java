@@ -51,8 +51,8 @@ public class App {
      * 次のトークンが期待している記号の時には、トークンを1つ読み進めてtrueを返す。
      * それ以外の場合はfalseを返す。
      */
-    private static boolean consume(char op) {
-        if (token.kind() != TokenKind.Reserved || token.cur(0) != op) {
+    private static boolean consume(String op) {
+        if (token.kind() != TokenKind.Reserved || !token.cur().equals(op)) {
             return false;
         }
         token = token.next();
@@ -63,9 +63,9 @@ public class App {
      * 次のトークンが期待している記号のときには、トークンを1つ読み進める。
      * それ以外の場合にはエラーを報告する。
      */
-    private static void expect(char op) {
-        if (token.kind() != TokenKind.Reserved || token.cur(0) != op) {
-            error_at("Unexpected character: '%c'", token.cur(0));
+    private static void expect(String op) {
+        if (token.kind() != TokenKind.Reserved || !token.cur().equals(op)) {
+            error_at("Unexpected token: \"%s\"", token.cur());
         }
         token = token.next();
     }
@@ -76,21 +76,60 @@ public class App {
      */
     private static int expect_number() {
         if (token.kind() != TokenKind.Num) {
-            error_at("Not a number");
+            error_at("Not a number: \"%s\"", token.cur());
         }
         int val = token.val();
         token = token.next();
         return val;
     }
 
-    // expr = mul ('+' mul | '-' mul)*
+    // expr = equality
     private static Node expr() {
+        return equality();
+    }
+
+    // equality = relational ("==" relational | "!=" relational)*
+    private static Node equality() {
+        Node node = relational();
+
+        while (true) {
+            if (consume("==")) {
+                node = Node.new_node(NodeKind.Eq, node, relational());
+            } else if (consume("!=")) {
+                node = Node.new_node(NodeKind.Ne, node, relational());
+            } else {
+                return node;
+            }
+        }
+    }
+
+    // relational = add ("<" add | "<=" add | ">" add | ">=" add)*
+    private static Node relational() {
+        Node node = add();
+
+        while (true) {
+            if (consume("<")) {
+                node = Node.new_node(NodeKind.Lt, node, add());
+            } else if (consume("<=")) {
+                node = Node.new_node(NodeKind.Le, node, add());
+            } else if (consume(">")) {
+                node = Node.new_node(NodeKind.Lt, add(), node);
+            } else if (consume(">=")) {
+                node = Node.new_node(NodeKind.Le, add(), node);
+            } else {
+                return node;
+            }
+        }
+    }
+
+    // add = mul ("+" mul | "-" mul)*
+    private static Node add() {
         Node node = mul();
 
         while (true) {
-            if (consume('+')) {
+            if (consume("+")) {
                 node = Node.new_node(NodeKind.Add, node, mul());
-            } else if (consume('-')) {
+            } else if (consume("-")) {
                 node = Node.new_node(NodeKind.Sub, node, mul());
             } else {
                 return node;
@@ -98,14 +137,14 @@ public class App {
         }
     }
 
-    // mul = unary ('*' unary | '/' unary)*
+    // mul = unary ("*" unary | "/" unary)*
     private static Node mul() {
         Node node = unary();
 
         while (true) {
-            if (consume('*')) {
+            if (consume("*")) {
                 node = Node.new_node(NodeKind.Mul, node, unary());
-            } else if (consume('/')) {
+            } else if (consume("/")) {
                 node = Node.new_node(NodeKind.Div, node, unary());
             } else {
                 return node;
@@ -113,23 +152,23 @@ public class App {
         }
     }
 
-    // unary = ('+' | '-')? unary
+    // unary = ("+" | "-")? unary
     private static Node unary() {
-        if (consume('+')) {
+        if (consume("+")) {
             return unary();
         }
-        if (consume('-')) {
+        if (consume("-")) {
             return Node.new_node(NodeKind.Sub, Node.new_node_num(0), unary());
         }
         return primary();
     }
 
-    // primary = '(' expr ')' | num
+    // primary = "(" expr ")" | num
     private static Node primary() {
-        // 次のトークンが '(' なら、 '(' expr ')' のはず
-        if (consume('(')) {
+        // 次のトークンが "(" なら、 "(" expr ")" のはず
+        if (consume("(")) {
             Node node = expr();
-            expect(')');
+            expect(")");
             return node;
         }
 
@@ -163,6 +202,26 @@ public class App {
             case Div:
                 System.out.println("    cqo");
                 System.out.println("    idiv rdi");
+                break;
+            case Eq:
+                System.out.println("    cmp rax, rdi");
+                System.out.println("    sete al");
+                System.out.println("    movzb rax, al");
+                break;
+            case Ne:
+                System.out.println("    cmp rax, rdi");
+                System.out.println("    setne al");
+                System.out.println("    movzb rax, al");
+                break;
+            case Lt:
+                System.out.println("    cmp rax, rdi");
+                System.out.println("    setl al");
+                System.out.println("    movzb rax, al");
+                break;
+            case Le:
+                System.out.println("    cmp rax, rdi");
+                System.out.println("    setle al");
+                System.out.println("    movzb rax, al");
                 break;
         }
 

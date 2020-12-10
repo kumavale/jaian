@@ -2,11 +2,12 @@ package jaian;
 
 /** トークン型 */
 public class Token {
+    private static String src;  /** 入力文字列 */
+
     private TokenKind kind;     /** トークンの型 */
     private Token next;         /** 次のトークン */
-    private int val;            /** kindがNumの場合、その数値 */
     private int idx;            /** 現在のインデックス */
-    private static String src;  /** 入力文字列 */
+    private int len;            /** トークンの長さ */
 
     /** Tokenクラスの初期化 */
     public Token() {}
@@ -23,38 +24,50 @@ public class Token {
                 continue;
             }
 
-            if ("+-*/()".indexOf(ch) != -1) {
-                cur = new_token(TokenKind.Reserved, cur, idx);
+            if (("=!<>".indexOf(ch) != -1) && (idx < src.length()) && (src.charAt(idx+1) == '=')) {
+                cur = new_token(TokenKind.Reserved, cur, idx++, 2);
+                continue;
+            }
+
+            if ("+-*/()<>".indexOf(ch) != -1) {
+                cur = new_token(TokenKind.Reserved, cur, idx, 1);
                 continue;
             }
 
             if (Character.isDigit(ch)) {
-                cur = new_token(TokenKind.Num, cur, idx);
-                int begin = idx;
-                while (idx+1 < src.length() && Character.isDigit(src.charAt(idx+1))) { ++idx; };
-                cur.val = Integer.parseInt(src.substring(begin, idx+1));
+                cur = new_token(TokenKind.Num, cur, idx, 1);
+                while (idx+1 < src.length() && Character.isDigit(src.charAt(idx+1))) {
+                    ++cur.len;
+                    ++idx;
+                };
                 continue;
             }
 
             App.error("Failed tokenize");
         }
 
-        new_token(TokenKind.EOF, cur, idx);
+        new_token(TokenKind.EOF, cur, idx, 0);
         return head.next;
     }
 
     /** 新しいトークンを作成してcurに繋げる */
-    public static Token new_token(TokenKind kind, Token cur, int index) {
+    public static Token new_token(TokenKind kind, Token cur, int index, int len) {
         Token tok = new Token();
         tok.kind = kind;
         cur.next = tok;
         tok.idx  = index;
+        tok.len  = len;
         return tok;
     }
 
-    /** 現在のインデックスと引数で渡されたインデックスを合計したインデックスの文字を返す */
-    public char cur(int index) {
-        return src.charAt(this.idx + index);
+    /** 現在のトークンの文字列を返す */
+    public String cur() {
+        return this.src.substring(this.idx, this.idx + this.len);
+    }
+
+    /** 整数を返す */
+    public int val() {
+        return Integer.parseInt(this.cur());
     }
 
     /** tokenがEOFかどうか */
@@ -63,11 +76,11 @@ public class Token {
     }
 
     // Getters
+    public String src()     { return this.src; }
     public TokenKind kind() { return this.kind; }
     public Token next()     { return this.next; }
-    public int val()        { return this.val; }
     public int idx()        { return this.idx; }
-    public String src()     { return this.src; }
+    public int len()        { return this.len; }
 
     /** 空白文字ならtrueを返す */
     private static boolean is_whitespace(char c) {
