@@ -98,19 +98,30 @@ public class App {
         }
     }
 
-    // mul = primary ('*' primary | '/' primary)*
+    // mul = unary ('*' unary | '/' unary)*
     private static Node mul() {
-        Node node = primary();
+        Node node = unary();
 
         while (true) {
             if (consume('*')) {
-                node = Node.new_node(NodeKind.Mul, node, primary());
+                node = Node.new_node(NodeKind.Mul, node, unary());
             } else if (consume('/')) {
-                node = Node.new_node(NodeKind.Div, node, primary());
+                node = Node.new_node(NodeKind.Div, node, unary());
             } else {
                 return node;
             }
         }
+    }
+
+    // unary = ('+' | '-')? unary
+    private static Node unary() {
+        if (consume('+')) {
+            return unary();
+        }
+        if (consume('-')) {
+            return Node.new_node(NodeKind.Sub, Node.new_node_num(0), unary());
+        }
+        return primary();
     }
 
     // primary = '(' expr ')' | num
