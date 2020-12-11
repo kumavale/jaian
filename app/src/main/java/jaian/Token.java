@@ -20,20 +20,13 @@ public class Token {
 
         for (; idx < src.length(); ++idx) {
             char ch = src.charAt(idx);
+
+            // 空白文字をスキップ
             if (is_whitespace(ch)) {
                 continue;
             }
 
-            if (("=!<>".indexOf(ch) != -1) && (idx < src.length()) && (src.charAt(idx+1) == '=')) {
-                cur = new_token(TokenKind.Reserved, cur, idx++, 2);
-                continue;
-            }
-
-            if ("+-*/()<>".indexOf(ch) != -1) {
-                cur = new_token(TokenKind.Reserved, cur, idx, 1);
-                continue;
-            }
-
+            // 整数リテラル
             if (Character.isDigit(ch)) {
                 cur = new_token(TokenKind.Num, cur, idx, 1);
                 while (idx+1 < src.length() && Character.isDigit(src.charAt(idx+1))) {
@@ -43,7 +36,25 @@ public class Token {
                 continue;
             }
 
-            App.error("Failed tokenize");
+            // 識別子
+            if (Character.isAlphabetic(ch)) {
+                cur = new_token(TokenKind.Ident, cur, idx, 1);
+                continue;
+            }
+
+            // "==", "!=", "<=", ">="
+            if (("=!<>".indexOf(ch) != -1) && (idx < src.length()) && (src.charAt(idx+1) == '=')) {
+                cur = new_token(TokenKind.Punct, cur, idx++, 2);
+                continue;
+            }
+
+            // 区切り文字
+            if ("+-*/()<>=;".indexOf(ch) != -1) {
+                cur = new_token(TokenKind.Punct, cur, idx, 1);
+                continue;
+            }
+
+            App.error_at("invalid token");
         }
 
         new_token(TokenKind.EOF, cur, idx, 0);

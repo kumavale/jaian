@@ -3,8 +3,11 @@
  */
 package jaian;
 
+import java.util.ArrayList;
+
 public class App {
     private static Token token;
+    private static ArrayList<Node> code = new ArrayList<Node>();
 
     public static void main(String[] args) {
         if (args.length != 1) {
@@ -13,21 +16,35 @@ public class App {
         }
 
         // トークナイズしてパースする
+        // 結果はcodeに保存される
         String src = args[0];
         token = Token.tokenize(src);
-        Node node = expr();
+        program();
 
         // アセンブリの前半部分を出力
         System.out.println(".intel_syntax noprefix");
         System.out.println(".globl main");
         System.out.println("main:");
 
-        // 抽象構文木を下りながらコード生成
-        gen(node);
+        // プロローグ
+        // 変数26個分の領域を確保する
+        System.out.println("    push rbp");
+        System.out.println("    mov rbp, rsp");
+        System.out.println("    sub rsp, 208");
 
-        // スタックトップに式全体の値が残っているので
-        // それをRAXにロードして関数からの返り値とする
-        System.out.println("    pop rax");
+        // 先頭の式から順にコード生成
+        for (int i = 0; i < code.size(); ++i) {
+            gen(code.get(i));
+
+            // 式の評価結果としてスタックに一つの値が残っている
+            // はずなので、スタックが溢れないようにポップしておく
+            System.out.println("    pop rax");
+        }
+
+        // エピローグ
+        // 最後の式の結果がRAXに残っているのでそれが返り値になる
+        System.out.println("    mov rsp, rbp");
+        System.out.println("    pop rbp");
         System.out.println("    ret");
     }
 
@@ -52,7 +69,7 @@ public class App {
      * それ以外の場合はfalseを返す。
      */
     private static boolean consume(String op) {
-        if (token.kind() != TokenKind.Reserved || !token.cur().equals(op)) {
+        if (token.kind() != TokenKind.Punct || !token.cur().equals(op)) {
             return false;
         }
         token = token.next();
@@ -60,11 +77,24 @@ public class App {
     }
 
     /**
+     * 次のトークンが識別子である場合、トークンを進めてそれを返す
+     * それ以外の場合にはnullを返す。
+     */
+    private static Token consume_ident() {
+        if (token.kind() != TokenKind.Ident) {
+            return null;
+        }
+        Token tok = token;
+        token = token.next();
+        return tok;
+    }
+
+    /**
      * 次のトークンが期待している記号のときには、トークンを1つ読み進める。
      * それ以外の場合にはエラーを報告する。
      */
     private static void expect(String op) {
-        if (token.kind() != TokenKind.Reserved || !token.cur().equals(op)) {
+        if (token.kind() != TokenKind.Punct || !token.cur().equals(op)) {
             error_at("Unexpected token: \"%s\"", token.cur());
         }
         token = token.next();
@@ -83,9 +113,33 @@ public class App {
         return val;
     }
 
-    // expr = equality
+    // program = stmt*
+    private static void program() {
+        int i = 0;
+        while (!token.at_eof()) {
+            code.add(stmt());
+        }
+    }
+
+    // stmt = expr ";"
+    private static Node stmt() {
+        Node node = expr();
+        expect(";");
+        return node;
+    }
+
+    // expr = assign
     private static Node expr() {
-        return equality();
+        return assign();
+    }
+
+    // assign = equality ("=" assign)?
+    private static Node assign() {
+        Node node = equality();
+        if (consume("=")) {
+            node = Node.new_node(NodeKind.Assign, node, assign());
+        }
+        return node;
     }
 
     // equality = relational ("==" relational | "!=" relational)*
@@ -163,7 +217,7 @@ public class App {
         return primary();
     }
 
-    // primary = "(" expr ")" | num
+    // primary = "(" expr ")" | ident | num
     private static Node primary() {
         // 次のトークンが "(" なら、 "(" expr ")" のはず
         if (consume("(")) {
@@ -172,15 +226,47 @@ public class App {
             return node;
         }
 
+        Token tok = consume_ident();
+        if (tok != null) {
+            Node node = Node.new_node(NodeKind.Var, null, null);
+            node.set_offset((tok.cur().charAt(0) - 'a' + 1) * 8);
+            return node;
+        }
+
         // そうでなければ数値のはず
         return Node.new_node_num(expect_number());
     }
 
+    /** 式を左辺値として評価 */
+    private static void gen_val(Node node) {
+        if (node.kind() != NodeKind.Var) {
+            error("not a variable");
+        }
+        System.out.printf("    mov rax, rbp\n");
+        System.out.printf("    sub rax, %d\n", node.offset());
+        System.out.printf("    push rax\n");
+    }
+
     /** コード生成 */
     private static void gen(Node node) {
-        if (node.kind() == NodeKind.Num) {
-            System.out.printf("    push %d\n", node.val());
-            return;
+        switch (node.kind()) {
+            case Num:
+                System.out.printf("    push %d\n", node.val());
+                return;
+            case Var:
+                gen_val(node);
+                System.out.println("    pop rax");
+                System.out.println("    mov rax, [rax]");
+                System.out.println("    push rax");
+                return;
+            case Assign:
+                gen_val(node.lhs());
+                gen(node.rhs());
+                System.out.println("    pop rdi");
+                System.out.println("    pop rax");
+                System.out.println("    mov [rax], rdi");
+                System.out.println("    push rdi");
+                return;
         }
 
         gen(node.lhs());

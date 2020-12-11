@@ -6,6 +6,7 @@ public class Node {
     private Node lhs;       /** 左辺 */
     private Node rhs;       /** 右辺 */
     private int val;        /** kindがNumの場合のみ使用 */
+    private int offset;     /** kindがVarの場合のみ使用 */
 
     public static Node new_node(NodeKind kind, Node lhs, Node rhs) {
         Node node = new Node();
@@ -27,5 +28,9 @@ public class Node {
     public Node lhs()      { return this.lhs; }
     public Node rhs()      { return this.rhs; }
     public int val()       { return this.val; }
+    public int offset()    { return this.offset; }
+
+    // Setters
+    public void set_offset(int offset) { this.offset = offset; }
 }
 
