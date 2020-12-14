@@ -13,5 +13,8 @@ public enum NodeKind {
     Assign,  /** = */
     Var,     /** 変数 */
     Num,     /** 整数 */
+
+    // Keywords
+    Return,  /** "return" */
 }
 

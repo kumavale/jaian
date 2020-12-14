@@ -36,18 +36,25 @@ public class Token {
                 continue;
             }
 
-            // 識別子
+            // 識別子 もしくは 予約語
+            // アルファベットから始まり、アルファベットか数字かアンダースコアが続く
             if (Character.isAlphabetic(ch)) {
                 int begin = idx;
                 while (idx+1 < src.length()) {
                     char ch2 = src.charAt(idx+1);
-                    if (Character.isAlphabetic(ch2) || Character.isDigit(ch2) || ch2 == '_') {
+                    if (is_alnum_(ch2)) {
                         ++idx;
                     } else {
                         break;
                     }
                 }
-                cur = new_token(TokenKind.Ident, cur, begin, idx - begin + 1);
+                switch (src.substring(begin, idx + 1)) {
+                    case "return":
+                        cur = new_token(TokenKind.Return, cur, begin, idx - begin + 1);
+                        break;
+                    default:
+                        cur = new_token(TokenKind.Ident, cur, begin, idx - begin + 1);
+                }
                 continue;
             }
 
@@ -105,6 +112,11 @@ public class Token {
     /** 空白文字ならtrueを返す */
     private static boolean is_whitespace(char c) {
         return c == ' ' || c == '\n' || c == '\r' || c == '\t';
+    }
+
+    /** アルファベット、数字、アンダースコアであればtrueを返す */
+    private static boolean is_alnum_(char c) {
+        return Character.isAlphabetic(c) || Character.isDigit(c) || c == '_';
     }
 }
 

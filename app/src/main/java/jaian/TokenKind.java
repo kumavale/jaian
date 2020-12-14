@@ -6,5 +6,8 @@ public enum TokenKind {
     Punct,  /** 区切り文字 */
     Num,    /** 整数 */
     EOF,    /** 入力の終わり */
+
+    // Keywords
+    Return,  /** "return" */
 }
 

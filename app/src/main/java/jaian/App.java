@@ -122,9 +122,17 @@ public class App {
         }
     }
 
-    // stmt = expr ";"
+    // stmt = "return"? expr ";"
     private static Node stmt() {
-        Node node = expr();
+        Node node = null;
+
+        if (token.kind() == TokenKind.Return) {
+            token = token.next();
+            node = Node.new_node(NodeKind.Return, expr(), null);
+        } else {
+            node = expr();
+        }
+
         expect(";");
         return node;
     }
@@ -275,6 +283,13 @@ public class App {
                 System.out.println("    pop rax");
                 System.out.println("    mov [rax], rdi");
                 System.out.println("    push rdi");
+                return;
+            case Return:
+                gen(node.lhs());
+                System.out.println("    pop rax");
+                System.out.println("    mov rsp, rbp");
+                System.out.println("    pop rbp");
+                System.out.println("    ret");
                 return;
         }
 
