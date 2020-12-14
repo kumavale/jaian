@@ -7,6 +7,7 @@ import java.util.ArrayList;
 
 public class App {
     private static Token token;
+    private static SymbolTable st = new SymbolTable();
     private static ArrayList<Node> code = new ArrayList<Node>();
 
     public static void main(String[] args) {
@@ -69,7 +70,7 @@ public class App {
      * それ以外の場合はfalseを返す。
      */
     private static boolean consume(String op) {
-        if (token.kind() != TokenKind.Punct || !token.cur().equals(op)) {
+        if (token.kind() != TokenKind.Punct || !token.str().equals(op)) {
             return false;
         }
         token = token.next();
@@ -94,8 +95,8 @@ public class App {
      * それ以外の場合にはエラーを報告する。
      */
     private static void expect(String op) {
-        if (token.kind() != TokenKind.Punct || !token.cur().equals(op)) {
-            error_at("Unexpected token: \"%s\"", token.cur());
+        if (token.kind() != TokenKind.Punct || !token.str().equals(op)) {
+            error_at("Unexpected token: \"%s\"", token.str());
         }
         token = token.next();
     }
@@ -106,7 +107,7 @@ public class App {
      */
     private static int expect_number() {
         if (token.kind() != TokenKind.Num) {
-            error_at("Not a number: \"%s\"", token.cur());
+            error_at("Not a number: \"%s\"", token.str());
         }
         int val = token.val();
         token = token.next();
@@ -229,7 +230,15 @@ public class App {
         Token tok = consume_ident();
         if (tok != null) {
             Node node = Node.new_node(NodeKind.Var, null, null);
-            node.set_offset((tok.cur().charAt(0) - 'a' + 1) * 8);
+
+            Obj obj = st.find_var(tok);
+            if (obj != null) {
+                node.set_offset(obj.offset());
+            } else {
+                Obj new_obj = new Obj(tok.str(), st.offset() + 8);
+                node.set_offset(new_obj.offset());
+                st.push(new_obj);
+            }
             return node;
         }
 

@@ -38,7 +38,16 @@ public class Token {
 
             // 識別子
             if (Character.isAlphabetic(ch)) {
-                cur = new_token(TokenKind.Ident, cur, idx, 1);
+                int begin = idx;
+                while (idx+1 < src.length()) {
+                    char ch2 = src.charAt(idx+1);
+                    if (Character.isAlphabetic(ch2) || Character.isDigit(ch2) || ch2 == '_') {
+                        ++idx;
+                    } else {
+                        break;
+                    }
+                }
+                cur = new_token(TokenKind.Ident, cur, begin, idx - begin + 1);
                 continue;
             }
 
@@ -72,13 +81,13 @@ public class Token {
     }
 
     /** 現在のトークンの文字列を返す */
-    public String cur() {
+    public String str() {
         return this.src.substring(this.idx, this.idx + this.len);
     }
 
     /** 整数を返す */
     public int val() {
-        return Integer.parseInt(this.cur());
+        return Integer.parseInt(this.str());
     }
 
     /** tokenがEOFかどうか */
