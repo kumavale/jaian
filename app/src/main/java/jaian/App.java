@@ -9,6 +9,7 @@ public class App {
     private static Token token;
     private static SymbolTable st = new SymbolTable();
     private static ArrayList<Node> code = new ArrayList<Node>();
+    private static int seq = 0;
 
     public static void main(String[] args) {
         if (args.length != 1) {
@@ -78,6 +79,19 @@ public class App {
     }
 
     /**
+     * 次のトークンが期待している予約語の時には、トークンを1つ読み進めてtrueを返す。
+     * それ以外の場合はfalseを返す。
+     */
+    private static boolean consume_keyword(TokenKind kind) {
+        if (token.kind() == kind) {
+            token = token.next();
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
      * 次のトークンが識別子である場合、トークンを進めてそれを返す
      * それ以外の場合にはnullを返す。
      */
@@ -122,17 +136,32 @@ public class App {
         }
     }
 
-    // stmt = "return"? expr ";"
+    // stmt = expr ";"
+    //      | "if" "(" expr ")" stmt ("else" stmt)?  // TODO "(" boolean ")"
+    //      | "return" expr ";"
     private static Node stmt() {
-        Node node = null;
-
-        if (token.kind() == TokenKind.Return) {
-            token = token.next();
-            node = Node.new_node(NodeKind.Return, expr(), null);
-        } else {
-            node = expr();
+        // "if" "(" expr ")" stmt ("else" stmt)?
+        if (consume_keyword(TokenKind.If)) {
+            Node node = Node.new_node(NodeKind.If, null, null);
+            expect("(");
+            node.set_cond(expr());
+            expect(")");
+            node.set_then(stmt());
+            if (consume_keyword(TokenKind.Else)) {
+                node.set_els(stmt());
+            }
+            return node;
         }
 
+        // "return" expr ";"
+        if (consume_keyword(TokenKind.Return)) {
+            Node node = Node.new_node(NodeKind.Return, expr(), null);
+            expect(";");
+            return node;
+        }
+
+        // expr ";"
+        Node node = expr();
         expect(";");
         return node;
     }
@@ -254,6 +283,11 @@ public class App {
         return Node.new_node_num(expect_number());
     }
 
+    /** 連番をインクリメントして返す */
+    private static int sequence() {
+        return seq++;
+    }
+
     /** 式を左辺値として評価 */
     private static void gen_val(Node node) {
         if (node.kind() != NodeKind.Var) {
@@ -290,6 +324,24 @@ public class App {
                 System.out.println("    mov rsp, rbp");
                 System.out.println("    pop rbp");
                 System.out.println("    ret");
+                return;
+            case If:
+                int count = sequence();
+                gen(node.cond());
+                System.out.println("    pop rax");
+                System.out.println("    cmp rax, 0");
+                if (node.els() != null) {
+                    System.out.printf("    je .L.else.%d\n", count);
+                    gen(node.then());
+                    System.out.printf("    jmp .L.end.%d\n", count);
+                    System.out.printf(".L.else.%d:\n", count);
+                    gen(node.els());
+                    System.out.printf(".L.end.%d:\n", count);
+                } else {
+                    System.out.printf("    je .L.end.%d\n", count);
+                    gen(node.then());
+                    System.out.printf(".L.end.%d:\n", count);
+                }
                 return;
         }
 

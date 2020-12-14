@@ -15,6 +15,8 @@ public enum NodeKind {
     Num,     /** 整数 */
 
     // Keywords
+    If,      /** "if" */
+    Else,    /** "else" */
     Return,  /** "return" */
 }
 

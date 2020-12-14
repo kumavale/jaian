@@ -72,6 +72,16 @@ assert  6 'a=b=3; return a+b;'
 assert  3 'foo=3; return foo;'
 assert  8 'foo_123=3; bar=5; return foo_123+bar;'
 
+assert  3 'if (0) return 2; return 3;'
+assert  3 'if (1-1) return 2; return 3;'
+assert  3 'if (1==0) return 2; return 3;'
+assert  2 'if (2-1) return 2; return 3;'
+assert  3 'if (1) if(0) return 2; return 3;'
+
+assert  2 'if(1) return 2; else return 3;'
+assert  3 'if(0) return 2; else if(1) return 3;'
+assert  4 'if(0) return 2; else if(0) return 3; else return 4;'
+
 # Clean
 rm -f tmp tmp.s
 

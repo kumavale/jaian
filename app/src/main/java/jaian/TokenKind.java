@@ -8,6 +8,8 @@ public enum TokenKind {
     EOF,    /** 入力の終わり */
 
     // Keywords
+    If,      /** "if" */
+    Else,    /** "else" */
     Return,  /** "return" */
 }
 

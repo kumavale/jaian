@@ -49,11 +49,10 @@ public class Token {
                     }
                 }
                 switch (src.substring(begin, idx + 1)) {
-                    case "return":
-                        cur = new_token(TokenKind.Return, cur, begin, idx - begin + 1);
-                        break;
-                    default:
-                        cur = new_token(TokenKind.Ident, cur, begin, idx - begin + 1);
+                    case "if":     cur = new_token(TokenKind.If, cur, begin, idx - begin + 1); break;
+                    case "else":   cur = new_token(TokenKind.Else, cur, begin, idx - begin + 1); break;
+                    case "return": cur = new_token(TokenKind.Return, cur, begin, idx - begin + 1); break;
+                    default:       cur = new_token(TokenKind.Ident, cur, begin, idx - begin + 1);
                 }
                 continue;
             }
