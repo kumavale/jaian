@@ -4,13 +4,19 @@ OKCNT=0
 NGCNT=0
 
 
+# C function
+cat << EOF | gcc -xc -c -o func.o -
+    int ret0() { return 0; }
+    int ret42() { return 42; }
+EOF
+
 # Assertion
 function assert() {
     expected="$1"
     input="$2"
 
     gradle run --quiet --no-rebuild --args="'$input'" > tmp.s
-    cc -o tmp tmp.s
+    cc -o tmp tmp.s func.o
     ./tmp
     actual="$?"
 
@@ -95,8 +101,11 @@ assert  3 '{1; {2;} return 3;}'
 
 assert  5 '{ ;;; return 5; }'
 
-# Clean
-rm -f tmp tmp.s
+assert  0 '{ return ret0(); }'
+assert 42 '{ return ret42(); }'
+
+# Clean out
+rm -f tmp tmp.s func.o
 
 # Result
 echo

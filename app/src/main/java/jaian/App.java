@@ -305,7 +305,8 @@ public class App {
         return primary();
     }
 
-    // primary = "(" expr ")" | ident | num
+    // primary = "(" expr ")" | ident args? | num
+    // args    = "(" ")"
     private static Node primary() {
         // 次のトークンが "(" なら、 "(" expr ")" のはず
         if (consume("(")) {
@@ -316,6 +317,14 @@ public class App {
 
         Token tok = consume_ident();
         if (tok != null) {
+            // Function call
+            if (consume("(")) {
+                expect(")");
+                Node node = Node.new_node(NodeKind.FuncCall, null, null);
+                node.set_funcname(tok.str());
+                return node;
+            }
+
             Node node = Node.new_node(NodeKind.Var, null, null);
 
             Obj obj = st.find_var(tok);
@@ -379,6 +388,10 @@ public class App {
                 System.out.println("    mov rsp, rbp");
                 System.out.println("    pop rbp");
                 System.out.println("    ret");
+                return;
+            case FuncCall:
+                System.out.printf("    call %s\n", node.funcname());
+                System.out.printf("    push rax\n");
                 return;
             case If: {
                 int count = sequence();
