@@ -137,7 +137,7 @@ public class App {
         }
     }
 
-    // stmt = expr ";"
+    // stmt = expr? ";"
     //      | "{" expr* "}"
     //      | "if" "(" expr ")" stmt ("else" stmt)?  // TODO "(" boolean ")"
     //      | "while" "(" expr ")" stmt  // TODO "(" boolean ")"
@@ -207,7 +207,10 @@ public class App {
             return node;
         }
 
-        // expr ";"
+        // expr? ";"
+        if (consume(";")) {
+            return Node.new_node(NodeKind.Block, null, null);
+        }
         Node node = expr();
         expect(";");
         return node;

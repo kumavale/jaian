@@ -93,6 +93,8 @@ assert  1 '{ for(;;) return 1; return 0; }'
 
 assert  3 '{1; {2;} return 3;}'
 
+assert  5 '{ ;;; return 5; }'
+
 # Clean
 rm -f tmp tmp.s
 
