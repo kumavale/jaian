@@ -139,6 +139,7 @@ public class App {
     // stmt = expr ";"
     //      | "if" "(" expr ")" stmt ("else" stmt)?  // TODO "(" boolean ")"
     //      | "while" "(" expr ")" stmt  // TODO "(" boolean ")"
+    //      | "for" "(" expr? ";" expr? ";" expr? ")" stmt  // TODO "(" boolean ")"
     //      | "return" expr ";"
     private static Node stmt() {
         // "if" "(" expr ")" stmt ("else" stmt)?
@@ -160,6 +161,26 @@ public class App {
             expect("(");
             node.set_cond(expr());
             expect(")");
+            node.set_then(stmt());
+            return node;
+        }
+
+        // "for" "(" expr? ";" expr? ";" expr? ")" stmt
+        if (consume_keyword(TokenKind.For)) {
+            Node node = Node.new_node(NodeKind.For, null, null);
+            expect("(");
+            if (!consume(";")) {
+                node.set_init(expr());
+                expect(";");
+            }
+            if (!consume(";")) {
+                node.set_cond(expr());
+                expect(";");
+            }
+            if (!consume(")")) {
+                node.set_inc(expr());
+                expect(")");
+            }
             node.set_then(stmt());
             return node;
         }
@@ -363,6 +384,26 @@ public class App {
                 System.out.println("    cmp rax, 0");
                 System.out.printf("    je .L.end.%d\n", count);
                 gen(node.then());
+                System.out.printf("    jmp .L.begin.%d\n", count);
+                System.out.printf(".L.end.%d:\n", count);
+                return;
+            }
+            case For: {
+                int count = sequence();
+                if (node.init() != null) {
+                    gen(node.init());
+                }
+                System.out.printf(".L.begin.%d:\n", count);
+                if (node.cond() != null) {
+                    gen(node.cond());
+                    System.out.println("    pop rax");
+                    System.out.println("    cmp rax, 0");
+                    System.out.printf("    je .L.end.%d\n", count);
+                }
+                gen(node.then());
+                if (node.inc() != null) {
+                    gen(node.inc());
+                }
                 System.out.printf("    jmp .L.begin.%d\n", count);
                 System.out.printf(".L.end.%d:\n", count);
                 return;

@@ -18,6 +18,7 @@ public enum NodeKind {
     If,      /** "if" */
     Else,    /** "else" */
     While,   /** "while" */
+    For,     /** "for" */
     Return,  /** "return" */
 }
 
