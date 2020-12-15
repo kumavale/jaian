@@ -11,6 +11,7 @@ public enum NodeKind {
     Lt,      /** < */
     Le,      /** <= */
     Assign,  /** = */
+    Block,   /** "{", "}" */
     Var,     /** 変数 */
     Num,     /** 整数 */
 

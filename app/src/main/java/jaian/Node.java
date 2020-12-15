@@ -17,6 +17,10 @@ public class Node {
     private Node init;  /** 初期化 */
     private Node inc;   /** インクリメント */
 
+    // Block "{" ... "}"
+    private Node next;  /** 次のstmt。ない場合はnull */
+    private Node body;  /** ブロック内のstmt */
+
     public static Node new_node(NodeKind kind, Node lhs, Node rhs) {
         Node node = new Node();
         node.kind = kind;
@@ -42,6 +46,8 @@ public class Node {
     public Node els()      { return this.els; }
     public Node init()     { return this.init; }
     public Node inc()      { return this.inc; }
+    public Node next()     { return this.next; }
+    public Node body()     { return this.body; }
     public int val()       { return this.val; }
     public int offset()    { return this.offset; }
 
@@ -52,5 +58,7 @@ public class Node {
     public void set_els(Node stmt)     { this.els    = stmt; }
     public void set_init(Node stmt)    { this.init   = stmt; }
     public void set_inc(Node stmt)     { this.inc    = stmt; }
+    public void set_next(Node stmt)    { this.next   = stmt; }
+    public void set_body(Node stmt)    { this.body   = stmt; }
 }
 

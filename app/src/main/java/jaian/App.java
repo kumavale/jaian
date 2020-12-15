@@ -3,12 +3,13 @@
  */
 package jaian;
 
+import java.util.List;
 import java.util.ArrayList;
 
 public class App {
     private static Token token;
     private static SymbolTable st = new SymbolTable();
-    private static ArrayList<Node> code = new ArrayList<Node>();
+    private static List<Node> code = new ArrayList<Node>();
     private static int seq = 0;
 
     public static void main(String[] args) {
@@ -137,11 +138,25 @@ public class App {
     }
 
     // stmt = expr ";"
+    //      | "{" expr* "}"
     //      | "if" "(" expr ")" stmt ("else" stmt)?  // TODO "(" boolean ")"
     //      | "while" "(" expr ")" stmt  // TODO "(" boolean ")"
     //      | "for" "(" expr? ";" expr? ";" expr? ")" stmt  // TODO "(" boolean ")"
     //      | "return" expr ";"
     private static Node stmt() {
+        // "{" expr* "}"
+        if (consume("{")) {
+            Node head = new Node();
+            Node cur = head;
+            while (!consume("}")) {
+                cur.set_next(stmt());
+                cur = cur.next();
+            }
+            Node node = Node.new_node(NodeKind.Block, null, null);
+            node.set_body(head.next());
+            return node;
+        }
+
         // "if" "(" expr ")" stmt ("else" stmt)?
         if (consume_keyword(TokenKind.If)) {
             Node node = Node.new_node(NodeKind.If, null, null);
@@ -349,6 +364,11 @@ public class App {
                 System.out.println("    pop rax");
                 System.out.println("    mov [rax], rdi");
                 System.out.println("    push rdi");
+                return;
+            case Block:
+                for (Node stmt = node.body(); stmt != null; stmt = stmt.next()) {
+                    gen(stmt);
+                }
                 return;
             case Return:
                 gen(node.lhs());
