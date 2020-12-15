@@ -10,6 +10,7 @@ public enum TokenKind {
     // Keywords
     If,      /** "if" */
     Else,    /** "else" */
+    While,   /** "while" */
     Return,  /** "return" */
 }
 

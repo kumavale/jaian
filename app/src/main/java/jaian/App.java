@@ -138,6 +138,7 @@ public class App {
 
     // stmt = expr ";"
     //      | "if" "(" expr ")" stmt ("else" stmt)?  // TODO "(" boolean ")"
+    //      | "while" "(" expr ")" stmt  // TODO "(" boolean ")"
     //      | "return" expr ";"
     private static Node stmt() {
         // "if" "(" expr ")" stmt ("else" stmt)?
@@ -150,6 +151,16 @@ public class App {
             if (consume_keyword(TokenKind.Else)) {
                 node.set_els(stmt());
             }
+            return node;
+        }
+
+        // "while" "(" expr ")" stmt  // TODO "(" boolean ")"
+        if (consume_keyword(TokenKind.While)) {
+            Node node = Node.new_node(NodeKind.While, null, null);
+            expect("(");
+            node.set_cond(expr());
+            expect(")");
+            node.set_then(stmt());
             return node;
         }
 
@@ -325,7 +336,7 @@ public class App {
                 System.out.println("    pop rbp");
                 System.out.println("    ret");
                 return;
-            case If:
+            case If: {
                 int count = sequence();
                 gen(node.cond());
                 System.out.println("    pop rax");
@@ -343,6 +354,19 @@ public class App {
                     System.out.printf(".L.end.%d:\n", count);
                 }
                 return;
+            }
+            case While: {
+                int count = sequence();
+                System.out.printf(".L.begin.%d:\n", count);
+                gen(node.cond());
+                System.out.println("    pop rax");
+                System.out.println("    cmp rax, 0");
+                System.out.printf("    je .L.end.%d\n", count);
+                gen(node.then());
+                System.out.printf("    jmp .L.begin.%d\n", count);
+                System.out.printf(".L.end.%d:\n", count);
+                return;
+            }
         }
 
         gen(node.lhs());

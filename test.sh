@@ -82,6 +82,9 @@ assert  2 'if(1) return 2; else return 3;'
 assert  3 'if(0) return 2; else if(1) return 3;'
 assert  4 'if(0) return 2; else if(0) return 3; else return 4;'
 
+assert  4 'i=5; j=0; while(i=i-1) j=j+1; return j;'
+assert  1 'while(0) return 0; return 1;'
+
 # Clean
 rm -f tmp tmp.s
 
