@@ -9,6 +9,7 @@ public class Node {
     private int offset;     /** kindがVarの場合のみ使用 */
 
     private String funcname;  /** 関数名 */
+    private Node args;        /** 関数の引数 */
 
     // "if"|"while"|"for" statement
     private Node cond;  /** 条件式 */
@@ -53,16 +54,18 @@ public class Node {
     public int val()         { return this.val; }
     public int offset()      { return this.offset; }
     public String funcname() { return this.funcname; }
+    public Node args()       { return this.args; }
 
     // Setters
-    public void set_offset(int offset)    { this.offset = offset; }
-    public void set_cond(Node expr)       { this.cond   = expr; }
-    public void set_then(Node stmt)       { this.then   = stmt; }
-    public void set_els(Node stmt)        { this.els    = stmt; }
-    public void set_init(Node stmt)       { this.init   = stmt; }
-    public void set_inc(Node stmt)        { this.inc    = stmt; }
-    public void set_next(Node stmt)       { this.next   = stmt; }
-    public void set_body(Node stmt)       { this.body   = stmt; }
+    public void set_offset(int offset)    { this.offset   = offset; }
+    public void set_cond(Node expr)       { this.cond     = expr; }
+    public void set_then(Node stmt)       { this.then     = stmt; }
+    public void set_els(Node stmt)        { this.els      = stmt; }
+    public void set_init(Node expr)       { this.init     = expr; }
+    public void set_inc(Node expr)        { this.inc      = expr; }
+    public void set_next(Node node)       { this.next     = node; }
+    public void set_body(Node stmt)       { this.body     = stmt; }
     public void set_funcname(String name) { this.funcname = name; }
+    public void set_args(Node args)       { this.args     = args; }
 }
 

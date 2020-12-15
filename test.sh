@@ -6,8 +6,15 @@ NGCNT=0
 
 # C function
 cat << EOF | gcc -xc -c -o func.o -
+    #include <assert.h>
     int ret0() { return 0; }
     int ret42() { return 42; }
+    int retx(int x) { return x; }
+    int add(int x, int y) { return x+y; }
+    int add6(int a, int b, int c, int d, int e, int f) {
+        assert(a==1 && b==2 && c==3 && d==4 && e==5 && f==6+7);
+        return a+b+c+d+e+f;
+    }
 EOF
 
 # Assertion
@@ -16,8 +23,7 @@ function assert() {
     input="$2"
 
     gradle run --quiet --no-rebuild --args="'$input'" > tmp.s
-    cc -o tmp tmp.s func.o
-    ./tmp
+    cc -o tmp tmp.s func.o && ./tmp
     actual="$?"
 
     if [ "$expected" = "$actual" ]; then
@@ -97,12 +103,16 @@ assert 55 '{ i=0; j=0; while(i<=10) {j=i+j; i=i+1; } return j; }'
 assert 10 '{ j=0; for(i=0; i<5; i=i+1) j=j+i; return j; }'
 assert  1 '{ for(;;) return 1; return 0; }'
 
-assert  3 '{1; {2;} return 3;}'
+assert  3 '{ 1; {2;} return 3; }'
 
 assert  5 '{ ;;; return 5; }'
 
 assert  0 '{ return ret0(); }'
 assert 42 '{ return ret42(); }'
+assert  3 '{ return retx(1+2); }'
+assert  7 '{ return add(3, 4); }'
+assert 10 '{ return add(5+6, 7-8); }'
+assert 28 '{ return add6(1,2,3,4,5,add(6,7)); }'
 
 # Clean out
 rm -f tmp tmp.s func.o

@@ -10,7 +10,8 @@ public class App {
     private static Token token;
     private static SymbolTable st = new SymbolTable();
     private static List<Node> code = new ArrayList<Node>();
-    private static int seq = 0;
+    private static int seq = 0;  // ラベル用シーケンスナンバー
+    private static final String[] argregs = { "rdi", "rsi", "rdx", "rcx", "r8", "r9" };  // 関数引数用レジスタ
 
     public static void main(String[] args) {
         if (args.length != 1) {
@@ -30,10 +31,10 @@ public class App {
         System.out.println("main:");
 
         // プロローグ
-        // 変数26個分の領域を確保する
+        // 変数の領域を確保する
         System.out.println("    push rbp");
         System.out.println("    mov rbp, rsp");
-        System.out.println("    sub rsp, 208");
+        System.out.printf("    sub rsp, %d\n", st.offset());
 
         // 先頭の式から順にコード生成
         for (int i = 0; i < code.size(); ++i) {
@@ -107,11 +108,11 @@ public class App {
 
     /**
      * 次のトークンが期待している記号のときには、トークンを1つ読み進める。
-     * それ以外の場合にはエラーを報告する。
+     * それ以外の場合にはエラーを報告して終了する。
      */
     private static void expect(String op) {
         if (token.kind() != TokenKind.Punct || !token.str().equals(op)) {
-            error_at("Unexpected token: \"%s\"", token.str());
+            error_at("expected token \"%s\", but got \"%s\"", op, token.str());
         }
         token = token.next();
     }
@@ -305,8 +306,24 @@ public class App {
         return primary();
     }
 
-    // primary = "(" expr ")" | ident args? | num
-    // args    = "(" ")"
+    // funccall = ident "(" (assign ("," assign)*)? ")"
+    private static Node funccall(Token tok) {
+        Node head = new Node();
+        Node cur = head;
+        while (!consume(")")) {
+            if (cur != head) {
+                consume(",");
+            }
+            cur.set_next(assign());
+            cur = cur.next();
+        }
+        Node node = Node.new_node(NodeKind.FuncCall, null, null);
+        node.set_funcname(tok.str());
+        node.set_args(head.next());
+        return node;
+    }
+
+    // primary = "(" expr ")" | ident func-args? | num
     private static Node primary() {
         // 次のトークンが "(" なら、 "(" expr ")" のはず
         if (consume("(")) {
@@ -317,14 +334,12 @@ public class App {
 
         Token tok = consume_ident();
         if (tok != null) {
-            // Function call
+            // 識別子の次が括弧の場合、関数である。
             if (consume("(")) {
-                expect(")");
-                Node node = Node.new_node(NodeKind.FuncCall, null, null);
-                node.set_funcname(tok.str());
-                return node;
+                return funccall(tok);
             }
 
+            // そうでなければ変数
             Node node = Node.new_node(NodeKind.Var, null, null);
 
             Obj obj = st.find_var(tok);
@@ -390,6 +405,21 @@ public class App {
                 System.out.println("    ret");
                 return;
             case FuncCall:
+                int nargs = 0;
+                for (Node arg = node.args(); arg != null; arg = arg.next()) {
+                    // 実引数の計算結果(rax)をスタックにpushしている
+                    gen(arg);
+                    ++nargs;
+                }
+                // 6つより多い引数はとりあえず実装しない
+                if (6 < nargs) {
+                    error("Not supported arguments greater than 6: '%s'", node.funcname());
+                }
+                // 引数6以下は専用のレジスタに格納
+                for (int i = nargs - 1; 0 <= i; --i) {
+                    // スタックから引数をレジスタにpop
+                    System.out.printf("    pop %s\n", argregs[i]);
+                }
                 System.out.printf("    call %s\n", node.funcname());
                 System.out.printf("    push rax\n");
                 return;
