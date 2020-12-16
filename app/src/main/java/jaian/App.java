@@ -10,7 +10,7 @@ import java.util.Collections;
 public class App {
     private static Token token, first;
     private static SymbolTable st = new SymbolTable();
-    private static List<Node> code = new ArrayList<Node>();
+    private static List<Function> code = new ArrayList<Function>();
     private static int seq = 0;  // ラベル用シーケンスナンバー
     private static final String[] argregs = { "rdi", "rsi", "rdx", "rcx", "r8", "r9" };  // 関数引数用レジスタ
 
@@ -29,29 +29,11 @@ public class App {
 
         // アセンブリの前半部分を出力
         System.out.println(".intel_syntax noprefix");
-        System.out.println(".globl main");
-        System.out.println("main:");
 
-        // プロローグ
-        // 変数の領域を確保する
-        System.out.println("    push rbp");
-        System.out.println("    mov rbp, rsp");
-        System.out.printf("    sub rsp, %d\n", st.offset());
-
-        // 先頭の式から順にコード生成
+        // 各関数毎にコード生成
         for (int i = 0; i < code.size(); ++i) {
-            gen(code.get(i));
-
-            // 式の評価結果としてスタックに一つの値が残っている
-            // はずなので、スタックが溢れないようにポップしておく
-            System.out.println("    pop rax");
+            gen_func(code.get(i));
         }
-
-        // エピローグ
-        // 最後の式の結果がRAXに残っているのでそれが返り値になる
-        System.out.println("    mov rsp, rbp");
-        System.out.println("    pop rbp");
-        System.out.println("    ret");
     }
 
     /** エラーを出力して終了 */
@@ -64,7 +46,9 @@ public class App {
     /** エラー位置を出力して終了 */
     public static void error_at(String fmt, Object... values) {
         System.err.println(token.src());
-        System.err.printf("%" + token.idx() + "s", "");
+        if (0 < token.idx()) {
+            System.err.printf("%" + token.idx() + "s", "");
+        }
         System.err.printf("%s ", String.join("", Collections.nCopies(token.len(), "^")));
         System.err.printf(fmt, values);
         System.exit(1);
@@ -142,8 +126,29 @@ public class App {
         int i = 0;
         token = first;
         while (!token.at_eof()) {
-            code.add(stmt());
+            code.add(function());
         }
+    }
+
+    // function
+    private static Function function() {
+        Function func = new Function();
+        if (!consume_keyword(TokenKind.Int)) {
+            error_at("required return type");
+        }
+        Token ident = consume_ident();
+        if (ident == null) {
+            error_at("expected identifier");
+        }
+        func.set_name(ident.str());
+        expect("(");
+            // 先ずは引数なし関数
+        expect(")");
+        expect("{");
+        while (!consume("}")) {
+            func.push(stmt());
+        }
+        return func;
     }
 
     // declaration = "int" ident ("=" expr)? ("," ident ("=" expr)?)* ";"
@@ -167,13 +172,15 @@ public class App {
                 if (tok == null) {
                     error_at("not a identifier");
                 }
-                Obj obj = st.find_var(tok);
-                if (obj != null) {
-                    error_at("variable '%s' is already defined", obj.name());
-                } else {
-                    Obj new_obj = new Obj(tok.str(), st.offset() + 8);
-                    st.push(new_obj);
+                if (st.find_var(tok) != null) {
+                    error_at("already defined");
                 }
+                if (consume("(")) {
+                    // 関数は無視
+                    break;
+                }
+                Obj new_obj = new Obj(tok.str(), st.offset() + 8);
+                st.push(new_obj);
                 if (!consume("=")) {
                     continue;
                 }
@@ -192,7 +199,9 @@ public class App {
     private static Node stmt() {
         // declaration
         if (consume_keyword(TokenKind.Int)) {
-            return assign_declaration();
+            Node node = assign_declaration();
+            expect(";");
+            return node;
         }
 
         // "{" expr* "}"
@@ -262,10 +271,12 @@ public class App {
             return node;
         }
 
-        // expr? ";"
+        // ";"
         if (consume(";")) {
             return Node.new_node(NodeKind.Block, null, null);
         }
+
+        // expr ";"
         Node node = expr();
         expect(";");
         return node;
@@ -287,6 +298,7 @@ public class App {
 
     // 宣言時専用の割り当て
     // 宣言のみで代入していない場合は無視
+    // 関数宣言も無視
     // assign_declaration = "int" equality ("=" assign)? ("," equality ("=" assign)?)*
     private static Node assign_declaration() {
         Node head = new Node();
@@ -429,6 +441,30 @@ public class App {
     /** 連番をインクリメントして返す */
     private static int sequence() {
         return seq++;
+    }
+
+    /** 関数単位のコード生成 */
+    private static void gen_func(Function func) {
+        // 関数のラベル
+        System.out.printf(".globl %s\n", func.name());
+        System.out.printf("%s:\n", func.name());
+
+        // プロローグ
+        // 変数の領域を確保する
+        System.out.println("    push rbp");
+        System.out.println("    mov rbp, rsp");
+        System.out.printf("    sub rsp, %d\n", st.offset());
+
+        // 先頭の式から順にコード生成
+        for (int i = 0; i < func.size(); ++i) {
+            gen(func.get(i));
+        }
+
+        // エピローグ
+        // 最後の式の結果がRAXに残っているのでそれが返り値になる
+        System.out.println("    mov rsp, rbp");
+        System.out.println("    pop rbp");
+        System.out.println("    ret");
     }
 
     /** 式を左辺値として評価 */

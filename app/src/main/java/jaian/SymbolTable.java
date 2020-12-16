@@ -1,10 +1,11 @@
 package jaian;
 
+import java.util.List;
 import java.util.ArrayList;
 
 /** シンボルテーブル */
 public class SymbolTable {
-    ArrayList<Obj> objs;  /** 変数リスト */
+    List<Obj> objs;  /** 変数リスト */
 
     // コンストラクタ
     public SymbolTable() {
