@@ -5,9 +5,10 @@ package jaian;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Collections;
 
 public class App {
-    private static Token token;
+    private static Token token, first;
     private static SymbolTable st = new SymbolTable();
     private static List<Node> code = new ArrayList<Node>();
     private static int seq = 0;  // ラベル用シーケンスナンバー
@@ -22,7 +23,8 @@ public class App {
         // トークナイズしてパースする
         // 結果はcodeに保存される
         String src = args[0];
-        token = Token.tokenize(src);
+        first = token = Token.tokenize(src);
+        declaration();  // 変数宣言の処理
         program();
 
         // アセンブリの前半部分を出力
@@ -63,7 +65,7 @@ public class App {
     public static void error_at(String fmt, Object... values) {
         System.err.println(token.src());
         System.err.printf("%" + token.idx() + "s", "");
-        System.err.printf("^ ");
+        System.err.printf("%s ", String.join("", Collections.nCopies(token.len(), "^")));
         System.err.printf(fmt, values);
         System.exit(1);
     }
@@ -78,6 +80,11 @@ public class App {
         }
         token = token.next();
         return true;
+    }
+
+    /** トークンを1つ読み進める。 */
+    private static void consume() {
+        token = token.next();
     }
 
     /**
@@ -133,18 +140,61 @@ public class App {
     // program = stmt*
     private static void program() {
         int i = 0;
+        token = first;
         while (!token.at_eof()) {
             code.add(stmt());
         }
     }
 
+    // declaration = "int" ident ("=" expr)? ("," ident ("=" expr)?)* ";"
+    // int a;
+    // int a, b;
+    // int a = 1;
+    // int a = 1, b;
+    // int a, b = 2;
+    // int a = 1, b = 2;
+    private static void declaration() {
+        while (!token.at_eof()) {
+            // intまでスキップ
+            while (true) {
+                if (token.at_eof()) { return; }
+                if (token.kind() == TokenKind.Int) { break; }
+                token = token.next();
+            }
+            consume();  // Intトークンを消費
+            do {
+                Token tok = consume_ident();
+                if (tok == null) {
+                    error_at("not a identifier");
+                }
+                Obj obj = st.find_var(tok);
+                if (obj != null) {
+                    error_at("variable '%s' is already defined", obj.name());
+                } else {
+                    Obj new_obj = new Obj(tok.str(), st.offset() + 8);
+                    st.push(new_obj);
+                }
+                if (!consume("=")) {
+                    continue;
+                }
+                assign();
+            } while (consume(","));
+        }
+    }
+
     // stmt = expr? ";"
+    //      | declaration
     //      | "{" expr* "}"
     //      | "if" "(" expr ")" stmt ("else" stmt)?  // TODO "(" boolean ")"
     //      | "while" "(" expr ")" stmt  // TODO "(" boolean ")"
-    //      | "for" "(" expr? ";" expr? ";" expr? ")" stmt  // TODO "(" boolean ")"
+    //      | "for" "(" (declaration|expr)? ";" expr? ";" expr? ")" stmt  // TODO "(" boolean ")"
     //      | "return" expr ";"
     private static Node stmt() {
+        // declaration
+        if (consume_keyword(TokenKind.Int)) {
+            return assign_declaration();
+        }
+
         // "{" expr* "}"
         if (consume("{")) {
             Node head = new Node();
@@ -181,12 +231,16 @@ public class App {
             return node;
         }
 
-        // "for" "(" expr? ";" expr? ";" expr? ")" stmt
+        // "for" "(" (declaration|expr)? ";" expr? ";" expr? ")" stmt
         if (consume_keyword(TokenKind.For)) {
             Node node = Node.new_node(NodeKind.For, null, null);
             expect("(");
             if (!consume(";")) {
-                node.set_init(expr());
+                if (consume_keyword(TokenKind.Int)) {
+                    node.set_init(assign_declaration());
+                } else {
+                    node.set_init(expr());
+                }
                 expect(";");
             }
             if (!consume(";")) {
@@ -228,6 +282,25 @@ public class App {
         if (consume("=")) {
             node = Node.new_node(NodeKind.Assign, node, assign());
         }
+        return node;
+    }
+
+    // 宣言時専用の割り当て
+    // 宣言のみで代入していない場合は無視
+    // assign_declaration = "int" equality ("=" assign)? ("," equality ("=" assign)?)*
+    private static Node assign_declaration() {
+        Node head = new Node();
+        Node cur = head;
+        do {
+            Node node = equality();
+            if (!consume("=")) {
+                continue;
+            }
+            cur.set_next(Node.new_node(NodeKind.Assign, node, assign()));
+            cur = cur.next();
+        } while (consume(","));
+        Node node = Node.new_node(NodeKind.Block, null, null);
+        node.set_body(head.next());
         return node;
     }
 
@@ -323,7 +396,7 @@ public class App {
         return node;
     }
 
-    // primary = "(" expr ")" | ident func-args? | num
+    // primary = "(" expr ")" | ident | ident func-args? | num
     private static Node primary() {
         // 次のトークンが "(" なら、 "(" expr ")" のはず
         if (consume("(")) {
@@ -338,18 +411,14 @@ public class App {
             if (consume("(")) {
                 return funccall(tok);
             }
-
             // そうでなければ変数
             Node node = Node.new_node(NodeKind.Var, null, null);
-
             Obj obj = st.find_var(tok);
-            if (obj != null) {
-                node.set_offset(obj.offset());
-            } else {
-                Obj new_obj = new Obj(tok.str(), st.offset() + 8);
-                node.set_offset(new_obj.offset());
-                st.push(new_obj);
+            if (obj == null) {
+                token = tok;  // 1つ前のトークンへ戻る
+                error_at("cannot find symbol");
             }
+            node.set_offset(obj.offset());
             return node;
         }
 

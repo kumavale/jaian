@@ -7,6 +7,9 @@ public enum TokenKind {
     Num,    /** 整数 */
     EOF,    /** 入力の終わり */
 
+    // Types
+    Int,  /** "int" */
+
     // Keywords
     If,      /** "if" */
     Else,    /** "else" */
