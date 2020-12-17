@@ -12,7 +12,7 @@ cat << EOF | gcc -xc -c -o func.o -
     int retx(int x) { return x; }
     int add(int x, int y) { return x+y; }
     int add6(int a, int b, int c, int d, int e, int f) {
-        assert(a==1 && b==2 && c==3 && d==4 && e==5 && f==6+7);
+        assert(a==1 && b==2 && c==3 && d==4 && e==5 && f==add(6, 7));
         return a+b+c+d+e+f;
     }
 EOF
@@ -120,6 +120,11 @@ assert 10 'int main() { return add(5+6, 7-8); }'
 assert 28 'int main() { return add6(1,2,3,4,5,add(6,7)); }'
 
 assert 32 'int main() { return ret32(); } int ret32() { return 32; }'
+assert  7 'int main() { return add2(3,4); } int add2(int x, int y) { return x+y; }'
+assert  1 'int main() { return sub2(4,3); } int sub2(int x, int y) { return x-y; }'
+assert 55 'int main() { return fib(9); } int fib(int x) { if (x<=1) return 1; return fib(x-1) + fib(x-2); }'
+assert 28 'int main() { return six(1, 2, 3, 4, 5, add(6, 7)); }
+int six(int a, int b, int c, int d, int e, int f) { return add6(a, b, c, d, e, f); }'
 
 # Clean out
 rm -f tmp tmp.s func.o

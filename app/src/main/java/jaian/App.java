@@ -66,22 +66,21 @@ public class App {
         return true;
     }
 
-    /** トークンを1つ読み進める。 */
-    private static void consume() {
-        token = token.next();
-    }
-
     /**
-     * 次のトークンが期待している予約語の時には、トークンを1つ読み進めてtrueを返す。
+     * 次のトークンが期待しているTokenKindの時には、トークンを1つ読み進めてtrueを返す。
      * それ以外の場合はfalseを返す。
      */
-    private static boolean consume_keyword(TokenKind kind) {
-        if (token.kind() == kind) {
-            token = token.next();
-            return true;
-        } else {
+    private static boolean consume(TokenKind kind) {
+        if (token.kind() != kind) {
             return false;
         }
+        token = token.next();
+        return true;
+    }
+
+    /** 無条件にトークンを1つ読み進める。 */
+    private static void consume() {
+        token = token.next();
     }
 
     /**
@@ -95,6 +94,30 @@ public class App {
         Token tok = token;
         token = token.next();
         return tok;
+    }
+
+    /**
+     * 次のトークンが識別子である場合、トークンを進めてそれを返す
+     * それ以外の場合にはエラーを出力して終了する。
+     */
+    private static Token expect_ident() {
+        if (token.kind() != TokenKind.Ident) {
+            error_at("expected identifier");
+        }
+        Token tok = token;
+        token = token.next();
+        return tok;
+    }
+
+    /**
+     * 次のトークンが期待しているTokenKindのときには、トークンを1つ読み進める。
+     * それ以外の場合にはエラーを報告して終了する。
+     */
+    private static void expect(TokenKind kind) {
+        if (token.kind() != kind) {
+            error_at("expected token \"%s\", but got \"%s\"", kind.toString().toLowerCase(), token.str());
+        }
+        token = token.next();
     }
 
     /**
@@ -121,7 +144,7 @@ public class App {
         return val;
     }
 
-    // program = stmt*
+    // program = function*
     private static void program() {
         int i = 0;
         token = first;
@@ -130,20 +153,33 @@ public class App {
         }
     }
 
-    // function
+    // function = type ident "(" (param ("," param)*)? ")" "{" stmt* "}"
+    // param = type ident
+    // type = "int"
     private static Function function() {
         Function func = new Function();
-        if (!consume_keyword(TokenKind.Int)) {
+        if (!consume(TokenKind.Int)) {
             error_at("required return type");
         }
-        Token ident = consume_ident();
-        if (ident == null) {
-            error_at("expected identifier");
-        }
+        Token ident = expect_ident();
         func.set_name(ident.str());
+
+        // 仮引数
         expect("(");
-            // 先ずは引数なし関数
-        expect(")");
+        while (!consume(")")) {
+            if (consume(TokenKind.Int)) {
+                func.push_param(expect_ident());
+            } else {
+                expect(")");
+                break;
+            }
+            if (!consume(",")) {
+                expect(")");
+                break;
+            }
+        }
+
+        // 中身
         expect("{");
         while (!consume("}")) {
             func.push(stmt());
@@ -158,6 +194,7 @@ public class App {
     // int a = 1, b;
     // int a, b = 2;
     // int a = 1, b = 2;
+    // int a, int b (仮引数)
     private static void declaration() {
         while (!token.at_eof()) {
             // intまでスキップ
@@ -166,12 +203,10 @@ public class App {
                 if (token.kind() == TokenKind.Int) { break; }
                 token = token.next();
             }
-            consume();  // Intトークンを消費
+            expect(TokenKind.Int);  // Intトークンを消費
             do {
-                Token tok = consume_ident();
-                if (tok == null) {
-                    error_at("not a identifier");
-                }
+                consume(TokenKind.Int);  // 仮引数用(仮実装)
+                Token tok = expect_ident();
                 if (st.find_var(tok) != null) {
                     error_at("already defined");
                 }
@@ -198,7 +233,7 @@ public class App {
     //      | "return" expr ";"
     private static Node stmt() {
         // declaration
-        if (consume_keyword(TokenKind.Int)) {
+        if (consume(TokenKind.Int)) {
             Node node = assign_declaration();
             expect(";");
             return node;
@@ -218,20 +253,20 @@ public class App {
         }
 
         // "if" "(" expr ")" stmt ("else" stmt)?
-        if (consume_keyword(TokenKind.If)) {
+        if (consume(TokenKind.If)) {
             Node node = Node.new_node(NodeKind.If, null, null);
             expect("(");
             node.set_cond(expr());
             expect(")");
             node.set_then(stmt());
-            if (consume_keyword(TokenKind.Else)) {
+            if (consume(TokenKind.Else)) {
                 node.set_els(stmt());
             }
             return node;
         }
 
         // "while" "(" expr ")" stmt  // TODO "(" boolean ")"
-        if (consume_keyword(TokenKind.While)) {
+        if (consume(TokenKind.While)) {
             Node node = Node.new_node(NodeKind.While, null, null);
             expect("(");
             node.set_cond(expr());
@@ -241,11 +276,11 @@ public class App {
         }
 
         // "for" "(" (declaration|expr)? ";" expr? ";" expr? ")" stmt
-        if (consume_keyword(TokenKind.For)) {
+        if (consume(TokenKind.For)) {
             Node node = Node.new_node(NodeKind.For, null, null);
             expect("(");
             if (!consume(";")) {
-                if (consume_keyword(TokenKind.Int)) {
+                if (consume(TokenKind.Int)) {
                     node.set_init(assign_declaration());
                 } else {
                     node.set_init(expr());
@@ -265,7 +300,7 @@ public class App {
         }
 
         // "return" expr ";"
-        if (consume_keyword(TokenKind.Return)) {
+        if (consume(TokenKind.Return)) {
             Node node = Node.new_node(NodeKind.Return, expr(), null);
             expect(";");
             return node;
@@ -455,10 +490,20 @@ public class App {
         System.out.println("    mov rbp, rsp");
         System.out.printf("    sub rsp, %d\n", st.offset());
 
+        // レジスタから仮引数へ保存する
+        int i = 0;
+        for (Token param: func.params()) {
+            System.out.printf("    mov [rbp-%d], %s\n", st.find_var(param).offset(), argregs[i++]);
+        }
+
         // 先頭の式から順にコード生成
-        for (int i = 0; i < func.size(); ++i) {
+        for (i = 0; i < func.size(); ++i) {
             gen(func.get(i));
         }
+
+        // 式の評価結果としてスタックに一つの値が残っている
+        // はずなので、スタックが溢れないようにポップしておく
+        System.out.println("    pop rax");
 
         // エピローグ
         // 最後の式の結果がRAXに残っているのでそれが返り値になる
