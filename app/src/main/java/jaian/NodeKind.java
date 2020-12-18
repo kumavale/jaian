@@ -22,5 +22,7 @@ public enum NodeKind {
     While,   /** "while" */
     For,     /** "for" */
     Return,  /** "return" */
+    True,    /** "true" */
+    False,   /** "false" */
 }
 

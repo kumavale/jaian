@@ -62,7 +62,7 @@ public class App {
         if (token.kind() != TokenKind.Punct || !token.str().equals(op)) {
             return false;
         }
-        token = token.next();
+        consume();
         return true;
     }
 
@@ -74,7 +74,7 @@ public class App {
         if (token.kind() != kind) {
             return false;
         }
-        token = token.next();
+        consume();
         return true;
     }
 
@@ -92,7 +92,7 @@ public class App {
             return null;
         }
         Token tok = token;
-        token = token.next();
+        consume();
         return tok;
     }
 
@@ -105,7 +105,7 @@ public class App {
             error_at("expected identifier");
         }
         Token tok = token;
-        token = token.next();
+        consume();
         return tok;
     }
 
@@ -117,7 +117,7 @@ public class App {
         if (token.kind() != kind) {
             error_at("expected token \"%s\", but got \"%s\"", kind.toString().toLowerCase(), token.str());
         }
-        token = token.next();
+        consume();
     }
 
     /**
@@ -128,7 +128,7 @@ public class App {
         if (token.kind() != TokenKind.Punct || !token.str().equals(op)) {
             error_at("expected token \"%s\", but got \"%s\"", op, token.str());
         }
-        token = token.next();
+        consume();
     }
 
     /**
@@ -140,8 +140,21 @@ public class App {
             error_at("Not a number: \"%s\"", token.str());
         }
         int val = token.val();
-        token = token.next();
+        consume();
         return val;
+    }
+
+    /**
+     * 次のトークンがType(型)の場合、トークンを1つ読み進めてそのTypeを返す。
+     * それ以外の場合にはエラーを報告する。
+     */
+    private static Type expect_type() {
+        switch (token.kind()) {
+            case Int:     consume(); return Type.Int;
+            case Boolean: consume(); return Type.Boolean;
+            default: error_at("Not a type: \"%s\"", token.str());
+        }
+        return null;  // unreachable
     }
 
     // program = function*
@@ -158,10 +171,9 @@ public class App {
     // type = "int"
     private static Function function() {
         Function func = new Function();
-        if (!consume(TokenKind.Int)) {
-            error_at("required return type");
-        }
+        Type return_type = expect_type();
         Token ident = expect_ident();
+        func.set_type(return_type);
         func.set_name(ident.str());
 
         // 仮引数
@@ -197,15 +209,18 @@ public class App {
     // int a, int b (仮引数)
     private static void declaration() {
         while (!token.at_eof()) {
-            // intまでスキップ
+            // TokenKind.Typeまでスキップ
             while (true) {
                 if (token.at_eof()) { return; }
-                if (token.kind() == TokenKind.Int) { break; }
-                token = token.next();
+                if (token.kind() == TokenKind.Int || token.kind() == TokenKind.Boolean) {
+                    break;
+                }
+                consume();
             }
-            expect(TokenKind.Int);  // Intトークンを消費
+            Type type = expect_type();  // Typeトークンを消費
             do {
-                consume(TokenKind.Int);  // 仮引数用(仮実装)
+                consume(TokenKind.Int);      // 仮引数用(仮実装)
+                consume(TokenKind.Boolean);  // 仮引数用(仮実装)
                 Token tok = expect_ident();
                 if (st.find_var(tok) != null) {
                     error_at("already defined");
@@ -214,7 +229,7 @@ public class App {
                     // 関数は無視
                     break;
                 }
-                Obj new_obj = new Obj(tok.str(), st.offset() + 8);
+                Obj new_obj = new Obj(tok.str(), type, st.offset() + 8);
                 st.push(new_obj);
                 if (!consume("=")) {
                     continue;
@@ -227,7 +242,7 @@ public class App {
     // stmt = expr? ";"
     //      | declaration
     //      | "{" expr* "}"
-    //      | "if" "(" expr ")" stmt ("else" stmt)?  // TODO "(" boolean ")"
+    //      | "if" "(" expr ")" stmt ("else" stmt)?
     //      | "while" "(" expr ")" stmt  // TODO "(" boolean ")"
     //      | "for" "(" (declaration|expr)? ";" expr? ";" expr? ")" stmt  // TODO "(" boolean ")"
     //      | "return" expr ";"
@@ -256,7 +271,17 @@ public class App {
         if (consume(TokenKind.If)) {
             Node node = Node.new_node(NodeKind.If, null, null);
             expect("(");
-            node.set_cond(expr());
+            Node cond = expr();
+            switch (cond.kind()) {
+                case Eq:
+                case Ne:
+                case Lt:
+                case Le:
+                case True:
+                case False: break;
+                default: error_at("incompatible types: expected \"boolean\"");
+            }
+            node.set_cond(cond);
             expect(")");
             node.set_then(stmt());
             if (consume(TokenKind.Else)) {
@@ -443,7 +468,7 @@ public class App {
         return node;
     }
 
-    // primary = "(" expr ")" | ident | ident func-args? | num
+    // primary = "(" expr ")" | ident | ident func-args? | num | boolean
     private static Node primary() {
         // 次のトークンが "(" なら、 "(" expr ")" のはず
         if (consume("(")) {
@@ -467,6 +492,15 @@ public class App {
             }
             node.set_offset(obj.offset());
             return node;
+        }
+
+        // boolean型
+        if (token.kind() == TokenKind.True) {
+            consume();
+            return Node.new_node(NodeKind.True, null, null);
+        } else if (token.kind() == TokenKind.False) {
+            consume();
+            return Node.new_node(NodeKind.False, null, null);
         }
 
         // そうでなければ数値のはず
@@ -527,6 +561,12 @@ public class App {
         switch (node.kind()) {
             case Num:
                 System.out.printf("    push %d\n", node.val());
+                return;
+            case True:
+                System.out.println("    push 1");
+                return;
+            case False:
+                System.out.println("    push 0");
                 return;
             case Var:
                 gen_val(node);

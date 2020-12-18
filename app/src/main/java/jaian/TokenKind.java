@@ -8,7 +8,8 @@ public enum TokenKind {
     EOF,    /** 入力の終わり */
 
     // Types
-    Int,  /** "int" */
+    Int,      /** "int" */
+    Boolean,  /** "boolean" */
 
     // Keywords
     If,      /** "if" */
@@ -16,5 +17,7 @@ public enum TokenKind {
     While,   /** "while" */
     For,     /** "for" */
     Return,  /** "return" */
+    True,    /** "true" */
+    False,   /** "false" */
 }
 
