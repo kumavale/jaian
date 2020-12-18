@@ -99,6 +99,18 @@ public class App {
     }
 
     /**
+     * 次のトークンがtypeである場合、トークンを進めてtypeを返す
+     * それ以外の場合にはnullを返す。
+     */
+    private static Type consume_type() {
+        switch (token.kind()) {
+            case Int:     consume(); return Type.Int;
+            case Boolean: consume(); return Type.Boolean;
+            default:                 return null;
+        }
+    }
+
+    /**
      * 次のトークンが識別子である場合、トークンを進めてそれを返す
      * それ以外の場合にはエラーを出力して終了する。
      */
@@ -157,6 +169,19 @@ public class App {
             default: error_at("Not a type: \"%s\"", token.str());
         }
         return null;  // unreachable
+    }
+
+    /** 指定のノードがbooleanとして解釈されない場合、エラーを報告して終了。 */
+    private static void expect_boolean(Node node) {
+        switch (node.kind()) {
+            case Eq:
+            case Ne:
+            case Lt:
+            case Le:
+            case True:
+            case False: break;
+            default: error_at("incompatible types: expected \"boolean\"");
+        }
     }
 
     // program = function*
@@ -221,8 +246,10 @@ public class App {
             }
             Type type = expect_type();  // Typeトークンを消費
             do {
-                consume(TokenKind.Int);      // 仮引数用(仮実装)
-                consume(TokenKind.Boolean);  // 仮引数用(仮実装)
+                Type new_type = consume_type();
+                if (new_type != null) {
+                    type = new_type;
+                }
                 Token tok = expect_ident();
                 if (st.find_var(tok) != null) {
                     error_at("already defined");
@@ -245,8 +272,8 @@ public class App {
     //      | declaration
     //      | "{" expr* "}"
     //      | "if" "(" expr ")" stmt ("else" stmt)?
-    //      | "while" "(" expr ")" stmt  // TODO "(" boolean ")"
-    //      | "for" "(" (declaration|expr)? ";" expr? ";" expr? ")" stmt  // TODO "(" boolean ")"
+    //      | "while" "(" expr ")" stmt
+    //      | "for" "(" (declaration|expr)? ";" expr? ";" expr? ")" stmt
     //      | "return" expr ";"
     private static Node stmt() {
         // declaration
@@ -274,15 +301,7 @@ public class App {
             Node node = Node.new_node(NodeKind.If, null, null);
             expect("(");
             Node cond = expr();
-            switch (cond.kind()) {
-                case Eq:
-                case Ne:
-                case Lt:
-                case Le:
-                case True:
-                case False: break;
-                default: error_at("incompatible types: expected \"boolean\"");
-            }
+            expect_boolean(cond);
             node.set_cond(cond);
             expect(")");
             node.set_then(stmt());
@@ -292,11 +311,13 @@ public class App {
             return node;
         }
 
-        // "while" "(" expr ")" stmt  // TODO "(" boolean ")"
+        // "while" "(" expr ")" stmt
         if (consume(TokenKind.While)) {
             Node node = Node.new_node(NodeKind.While, null, null);
             expect("(");
-            node.set_cond(expr());
+            Node cond = expr();
+            expect_boolean(cond);
+            node.set_cond(cond);
             expect(")");
             node.set_then(stmt());
             return node;
@@ -315,7 +336,9 @@ public class App {
                 expect(";");
             }
             if (!consume(";")) {
-                node.set_cond(expr());
+                Node cond = expr();
+                expect_boolean(cond);
+                node.set_cond(cond);
                 expect(";");
             }
             if (!consume(")")) {

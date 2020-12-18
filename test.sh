@@ -99,13 +99,13 @@ assert  3 'int main() { if(false) return 2; else if(true) return 3; }'
 assert  4 'int main() { if(false) return 2; else if(false) return 3; else return 4; }'
 assert  2 'int main() { if(true) { return 2; } else { return 3; } }'
 
-assert  4 'int main() { int i=5; int j=0; while(i=i-1) j=j+1; return j; }'
-assert  1 'int main() { while(0) return 0; return 1; }'
+assert  4 'int main() { int i=5; int j=0; while(0<(i=i-1)) j=j+1; return j; }'
+assert  1 'int main() { while(false) return 0; return 1; }'
 assert 55 'int main() { int i=0; int j=0; while(i<=10) {j=i+j; i=i+1; } return j; }'
 
 assert 10 'int main() { int j=0; for(int i=0; i<5; i=i+1) j=j+i; return j; }'
 assert 42 'int main() { for(int i=42; i<100; i=i+1) return i; return 21; }'
-assert 42 'int main() { for(int i=42, j; 1;) { j = i; return j; } return 21; }'
+assert 42 'int main() { for(int i=42, j; true;) { j = i; return j; } return 21; }'
 assert  1 'int main() { for(;;) return 1; return 0; }'
 
 assert  3 'int main() { 1; {2;} return 3; }'
