@@ -2,12 +2,14 @@ package jaian;
 
 /** トークン型 */
 public class Token {
-    private static String src;  /** 入力文字列 */
+    private static String src;    /** 入力文字列 */
+    private static int __LINE__;  /** 現在の行数 */
 
-    private TokenKind kind;     /** トークンの型 */
-    private Token next;         /** 次のトークン */
-    private int idx;            /** 現在のインデックス */
-    private int len;            /** トークンの長さ */
+    private TokenKind kind;  /** トークンの型 */
+    private Token next;      /** 次のトークン */
+    private int idx;         /** 現在のインデックス */
+    private int len;         /** トークンの長さ */
+    private int line;        /** このトークンがある行 */
 
     /** Tokenクラスの初期化 */
     public Token() {}
@@ -17,12 +19,16 @@ public class Token {
         Token head = new Token();
         Token cur = head;
         int idx = 0;
+        __LINE__ = 1;
 
         for (; idx < src.length(); ++idx) {
             char ch = src.charAt(idx);
 
             // 空白文字をスキップ
             if (is_whitespace(ch)) {
+                if (ch == '\n') {
+                    ++__LINE__;
+                }
                 continue;
             }
 
@@ -110,12 +116,26 @@ public class Token {
         cur.next = tok;
         tok.idx  = index;
         tok.len  = len;
+        tok.line = __LINE__;
         return tok;
     }
 
     /** 現在のトークンの文字列を返す */
     public String str() {
         return this.src.substring(this.idx, this.idx + this.len);
+    }
+
+    /** 現在の行をトークンとして返す */
+    public Token current_line() {
+        int begin = this.idx;
+        int end   = this.idx;
+        while (0 <= begin-1 && src.charAt(begin-1) != '\n') {
+            --begin;
+        }
+        while (end+1 < src.length() && src.charAt(end+1) != '\n') {
+            ++end;
+        }
+        return new_token(this.kind, this, begin, end - begin + 1);
     }
 
     /** 整数を返す */
@@ -134,6 +154,7 @@ public class Token {
     public Token next()     { return this.next; }
     public int idx()        { return this.idx; }
     public int len()        { return this.len; }
+    public int line()       { return this.line; }
 
     /** 空白文字ならtrueを返す */
     private static boolean is_whitespace(char c) {

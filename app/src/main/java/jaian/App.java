@@ -45,9 +45,11 @@ public class App {
 
     /** エラー位置を出力して終了 */
     public static void error_at(String fmt, Object... values) {
-        System.err.println(token.src());
-        if (0 < token.idx()) {
-            System.err.printf("%" + token.idx() + "s", "");
+        Token current_line = token.current_line();
+        System.err.printf(" \033[34m-->\033[0m %d:%d\n", token.line(), token.idx() - current_line.idx() + 1);
+        System.err.println(current_line.str());
+        if (0 < (token.idx() - current_line.idx())) {
+            System.err.printf("%" + (token.idx() - current_line.idx()) + "s", "");
         }
         System.err.printf("%s ", String.join("", Collections.nCopies(token.len(), "^")));
         System.err.printf(fmt, values);
