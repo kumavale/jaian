@@ -126,6 +126,13 @@ assert 55 'int main() { return fib(9); } int fib(int x) { if (x<=1) return 1; re
 assert 28 'int main() { return six(1, 2, 3, 4, 5, add(6, 7)); }
 int six(int a, int b, int c, int d, int e, int f) { return add6(a, b, c, d, e, f); }'
 
+assert 42 'int main() { // this is a linecomment
+return 42; } // and here'
+assert 42 'int main() { /**/ /* this is a block comment
+until */ return 42; } /* and here */'
+assert 42 'int main() { // /* this is a line comment
+return 42; /* // block */ }'
+
 # Clean out
 rm -f tmp tmp.s func.o
 

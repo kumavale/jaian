@@ -26,6 +26,25 @@ public class Token {
                 continue;
             }
 
+            // 行コメントをスキップ
+            if (src.startsWith("//", idx)) {
+                ++idx;
+                while (idx+1 < src.length()) {
+                    if (src.charAt(++idx) == '\n') {
+                        break;
+                    }
+                }
+                continue;
+            }
+
+            // ブロックコメントをスキップ
+            if (src.startsWith("/*", idx)) {
+                ++idx;
+                while (!src.startsWith("*/", ++idx));
+                ++idx;
+                continue;
+            }
+
             // 整数リテラル
             if (Character.isDigit(ch)) {
                 cur = new_token(TokenKind.Num, cur, idx, 1);
