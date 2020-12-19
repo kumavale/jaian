@@ -9,6 +9,7 @@ public enum TokenKind {
 
     // Types
     Int,      /** "int" */
+    Char,     /** "char" */
     Boolean,  /** "boolean" */
 
     // Keywords

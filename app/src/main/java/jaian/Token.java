@@ -6,6 +6,7 @@ public class Token {
     private static int __LINE__;  /** 現在の行数 */
 
     private TokenKind kind;  /** トークンの型 */
+    private Token prev;      /** 前のトークン */
     private Token next;      /** 次のトークン */
     private int idx;         /** 現在のインデックス */
     private int len;         /** トークンの長さ */
@@ -76,6 +77,7 @@ public class Token {
                 switch (src.substring(begin, idx + 1)) {
                     // Types
                     case "int":     cur = new_token(TokenKind.Int,     cur, begin, idx - begin + 1); break;
+                    case "char":    cur = new_token(TokenKind.Char,    cur, begin, idx - begin + 1); break;
                     case "boolean": cur = new_token(TokenKind.Boolean, cur, begin, idx - begin + 1); break;
                     // Keywords
                     case "if":      cur = new_token(TokenKind.If,      cur, begin, idx - begin + 1); break;
@@ -113,6 +115,7 @@ public class Token {
     public static Token new_token(TokenKind kind, Token cur, int index, int len) {
         Token tok = new Token();
         tok.kind = kind;
+        tok.prev = cur;
         cur.next = tok;
         tok.idx  = index;
         tok.len  = len;
@@ -148,9 +151,20 @@ public class Token {
         return this.kind == TokenKind.EOF;
     }
 
+    /** 型かどうか */
+    public boolean is_type() {
+        switch (this.kind) {
+            case Int:
+            case Char:
+            case Boolean: return true;
+        }
+        return false;
+    }
+
     // Getters
     public String src()     { return this.src; }
     public TokenKind kind() { return this.kind; }
+    public Token prev()     { return this.prev; }
     public Token next()     { return this.next; }
     public int idx()        { return this.idx; }
     public int len()        { return this.len; }

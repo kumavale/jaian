@@ -5,8 +5,9 @@ public class Node {
     private NodeKind kind;  /** ノードの型 */
     private Node lhs;       /** 左辺 */
     private Node rhs;       /** 右辺 */
-    private int val;        /** kindがNumの場合のみ使用 */
-    private int offset;     /** kindがVarの場合のみ使用 */
+    private int val;        /** kindがNumの場合のみ使用。数値リテラル */
+    private int offset;     /** kindがVar|Arrayの場合のみ使用。RBPからのオフセット */
+    private Type type;      /** 予想される型。どの型でもない場合はnull */
 
     private String funcname;  /** 関数名 */
     private Node args;        /** 関数の引数 */
@@ -56,6 +57,7 @@ public class Node {
     public Node element()    { return this.body; }
     public String funcname() { return this.funcname; }
     public Node args()       { return this.args; }
+    public Type type()       { return this.type; }
 
     // Setters
     public void set_offset(int offset)    { this.offset   = offset; }
@@ -69,5 +71,6 @@ public class Node {
     public void set_element(Node stmt)    { this.body     = stmt; }
     public void set_funcname(String name) { this.funcname = name; }
     public void set_args(Node args)       { this.args     = args; }
+    public void set_type(Type type)       { this.type     = type; }
 }
 

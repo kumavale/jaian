@@ -11,6 +11,7 @@ public class App {
     private static Token token, first;
     private static SymbolTable st = new SymbolTable();
     private static List<Function> code = new ArrayList<Function>();
+    private static Function current_func;
     private static int seq = 0;  // ラベル用シーケンスナンバー
     private static final String[] argregs = { "rdi", "rsi", "rdx", "rcx", "r8", "r9" };  // 関数引数用レジスタ
 
@@ -82,7 +83,16 @@ public class App {
 
     /** 無条件にトークンを1つ読み進める。 */
     private static void consume() {
-        token = token.next();
+        if (token.next() != null) {
+            token = token.next();
+        }
+    }
+
+    /** 無条件にトークンを1つ戻る。 */
+    private static void back() {
+        if (token.prev() != null) {
+            token = token.prev();
+        }
     }
 
     /**
@@ -105,6 +115,7 @@ public class App {
     private static Type consume_type() {
         switch (token.kind()) {
             case Int:     consume(); return Type.Int;
+            case Char:    consume(); return Type.Char;
             case Boolean: consume(); return Type.Boolean;
             default:                 return null;
         }
@@ -165,6 +176,7 @@ public class App {
     private static Type expect_type() {
         switch (token.kind()) {
             case Int:     consume(); return Type.Int;
+            case Char:    consume(); return Type.Char;
             case Boolean: consume(); return Type.Boolean;
             default: error_at("Not a type: \"%s\"", token.str());
         }
@@ -198,6 +210,7 @@ public class App {
     // type = "int"
     private static Function function() {
         Function func = new Function();
+        current_func = func;
         Type return_type = expect_type();
         Token ident = expect_ident();
         func.set_type(return_type);
@@ -206,7 +219,7 @@ public class App {
         // 仮引数
         expect("(");
         while (!consume(")")) {
-            if (consume(TokenKind.Int)) {
+            if (consume_type() != null) {
                 func.push_param(expect_ident());
             } else {
                 expect(")");
@@ -241,16 +254,13 @@ public class App {
             // TokenKind.Typeまでスキップ
             while (true) {
                 if (token.at_eof()) { return; }
-                if (token.kind() == TokenKind.Int || token.kind() == TokenKind.Boolean) {
-                    break;
-                }
+                if (token.is_type()) { break; }
                 consume();
             }
             Type type = expect_type();  // Typeトークンを消費
             do {
-                Type new_type = consume_type();
-                if (new_type != null) {
-                    type = new_type;
+                if (token.is_type()) {
+                    type = consume_type();
                 }
                 Token tok = expect_ident();
                 if (st.find_var(tok) != null) {
@@ -287,8 +297,9 @@ public class App {
     //      | "return" expr ";"
     private static Node stmt() {
         // declaration
-        if (consume(TokenKind.Int)) {
-            Node node = assign_declaration();
+        if (token.is_type()) {
+            Type type = consume_type();
+            Node node = assign_declaration(type);
             expect(";");
             return node;
         }
@@ -338,8 +349,9 @@ public class App {
             Node node = Node.new_node(NodeKind.For, null, null);
             expect("(");
             if (!consume(";")) {
-                if (consume(TokenKind.Int)) {
-                    node.set_init(assign_declaration());
+                if (token.is_type()) {
+                    Type type = consume_type();
+                    node.set_init(assign_declaration(type));
                 } else {
                     node.set_init(expr());
                 }
@@ -361,7 +373,12 @@ public class App {
 
         // "return" expr ";"
         if (consume(TokenKind.Return)) {
-            Node node = Node.new_node(NodeKind.Return, expr(), null);
+            Node return_value = expr();
+            if (return_value.type() != current_func.type() && return_value.type() != null) {
+                back();
+                error_at("mismatched return type");
+            }
+            Node node = Node.new_node(NodeKind.Return, return_value, null);
             expect(";");
             return node;
         }
@@ -384,26 +401,42 @@ public class App {
 
     // assign = equality ("=" assign)?
     private static Node assign() {
-        Node node = equality();
+        Node lhs = equality();
         if (consume("=")) {
-            node = Node.new_node(NodeKind.Assign, node, assign());
+            switch (lhs.kind()) {
+                case Var:
+                case Array: break;
+                default: back(); back(); error_at("invalid assign");
+            }
+            Node rhs = assign();
+            if (lhs.type() != rhs.type() && rhs.type() != null) {
+                back();
+                error_at("mismatched types");
+            }
+            lhs = Node.new_node(NodeKind.Assign, lhs, rhs);
         }
-        return node;
+        return lhs;
     }
 
     // 宣言時専用の割り当て
     // 宣言のみで代入していない場合は無視
     // 関数宣言も無視
-    // assign_declaration = "int" equality ("=" assign)? ("," equality ("=" assign)?)*
-    private static Node assign_declaration() {
+    // assign_declaration = type equality ("=" assign)? ("," equality ("=" assign)?)*
+    private static Node assign_declaration(Type type) {
         Node head = new Node();
         Node cur = head;
         do {
-            Node node = equality();
+            Node lhs = equality();
+            lhs.set_type(type);
             if (!consume("=")) {
                 continue;
             }
-            cur.set_next(Node.new_node(NodeKind.Assign, node, assign()));
+            Node rhs = assign();
+            if (lhs.type() != rhs.type() && rhs.type() != null) {
+                back();
+                error_at("mismatched types");
+            }
+            cur.set_next(Node.new_node(NodeKind.Assign, lhs, rhs));
             cur = cur.next();
         } while (consume(","));
         Node node = Node.new_node(NodeKind.Block, null, null);
@@ -423,6 +456,7 @@ public class App {
             } else {
                 return node;
             }
+            node.set_type(Type.Boolean);
         }
     }
 
@@ -442,6 +476,7 @@ public class App {
             } else {
                 return node;
             }
+            node.set_type(Type.Boolean);
         }
     }
 
@@ -451,9 +486,13 @@ public class App {
 
         while (true) {
             if (consume("+")) {
+                Type type = node.type();
                 node = Node.new_node(NodeKind.Add, node, mul());
+                node.set_type(type);
             } else if (consume("-")) {
+                Type type = node.type();
                 node = Node.new_node(NodeKind.Sub, node, mul());
+                node.set_type(type);
             } else {
                 return node;
             }
@@ -466,9 +505,13 @@ public class App {
 
         while (true) {
             if (consume("*")) {
+                Type type = node.type();
                 node = Node.new_node(NodeKind.Mul, node, unary());
+                node.set_type(type);
             } else if (consume("/")) {
+                Type type = node.type();
                 node = Node.new_node(NodeKind.Div, node, unary());
+                node.set_type(type);
             } else {
                 return node;
             }
@@ -481,7 +524,10 @@ public class App {
             return unary();
         }
         if (consume("-")) {
-            return Node.new_node(NodeKind.Sub, Node.new_node_num(0), unary());
+            Node unary = unary();
+            Node node = Node.new_node(NodeKind.Sub, Node.new_node_num(0), unary);
+            node.set_type(unary.type());
+            return node;
         }
         return primary();
     }
@@ -512,33 +558,35 @@ public class App {
             return node;
         }
 
-        Token tok = consume_ident();
-        if (tok != null) {
+        Token ident = consume_ident();
+        if (ident != null) {
             // 識別子の次が括弧の場合、関数である。
             if (consume("(")) {
-                return funccall(tok);
+                return funccall(ident);
             }
             // そうでなければ変数
-            Obj obj = st.find_var(tok);
-            if (obj == null) {
-                token = tok;  // 1つ前のトークンへ戻る
+            Obj val = st.find_var(ident);
+            if (val == null) {
+                back();
                 error_at("cannot find symbol");
             }
             // 配列
             // TODO postfix = primary ("[" expr "]")*
             if (consume("[")) {
-                if (!obj.is_array()) {
-                    token = tok;  // 1つ前のトークンへ戻る
+                if (!val.is_array()) {
+                    token = ident;
                     error_at("not a array");
                 }
                 Node node = Node.new_node(NodeKind.Array, null, null);
                 node.set_element(expr());
-                node.set_offset(obj.offset());
+                node.set_offset(val.offset());
+                node.set_type(val.type());
                 expect("]");
                 return node;
             } else {
                 Node node = Node.new_node(NodeKind.Var, null, null);
-                node.set_offset(obj.offset());
+                node.set_offset(val.offset());
+                node.set_type(val.type());
                 return node;
             }
         }
@@ -546,14 +594,20 @@ public class App {
         // boolean型
         if (token.kind() == TokenKind.True) {
             consume();
-            return Node.new_node(NodeKind.True, null, null);
+            Node node = Node.new_node(NodeKind.True, null, null);
+            node.set_type(Type.Boolean);
+            return node;
         } else if (token.kind() == TokenKind.False) {
             consume();
-            return Node.new_node(NodeKind.False, null, null);
+            Node node = Node.new_node(NodeKind.False, null, null);
+            node.set_type(Type.Boolean);
+            return node;
         }
 
         // そうでなければ数値のはず
-        return Node.new_node_num(expect_number());
+        Node node = Node.new_node_num(expect_number());
+        node.set_type(Type.Int);
+        return node;
     }
 
     /** 連番をインクリメントして返す */
@@ -563,6 +617,8 @@ public class App {
 
     /** 関数単位のコード生成 */
     private static void gen_func(Function func) {
+        current_func = func;
+
         // 関数のラベル
         System.out.printf(".globl %s\n", func.name());
         System.out.printf("%s:\n", func.name());
