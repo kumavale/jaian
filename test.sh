@@ -23,6 +23,11 @@ function assert() {
     input="$2"
 
     gradle run --quiet --no-rebuild --args="'$input'" > tmp.s
+    if [ "$?" -eq 1 ]; then
+        echo -e "'$input' => $actual ... \033[31mFAILED\033[0m"
+        NGCNT=$((NGCNT+1))
+        return 1;
+    fi
     cc -o tmp tmp.s func.o && ./tmp
     actual="$?"
 
@@ -31,7 +36,6 @@ function assert() {
         OKCNT=$((OKCNT+1))
     else
         echo -e "'$input' => $actual ... \033[31mFAILED\033[0m: expected $expected, but got $actual"
-        # exit 1
         NGCNT=$((NGCNT+1))
     fi
 }
@@ -136,6 +140,15 @@ return 42; /* // block */ }'
 assert  6 'int main() { int a[3]; a[0]=1; a[1]=2; a[2]=3; return a[0]+a[1]+a[2]; }'
 assert 15 'int main() { int a, b[99], c; a=4; b[42]=5; c=6; return a+b[42]+c; }'
 assert  2 'int main() { int a[3]; a[0]=2; a[1+1]=a[0]; return a[a[0]]; }'
+
+assert 42 'int main() { char x=42; return x; }'
+assert  1 'int main() { char x=1; char y=2; return x; }'
+assert  2 'int main() { char x=1; char y=2; return y; }'
+assert  3 'int main() { return sub_char(31, 17, 11); } int sub_char(char a, char b, char c) { return a-b-c; }'
+assert  4 'int main() { char x[10]; x[0]=1; x[1]=2; x[2]=3; return x[0]+x[2]; }'
+assert  5 'int main() { char x[10]; x[5]=5; return x[5]; }'
+assert 11 'int main() { char x=5; int a=7; char y=6; int b=8; return x+y; }'
+assert 15 'int main() { char x=5; int a=7; char y=6; int b=8; return a+b; }'
 
 # Clean out
 rm -f tmp tmp.s func.o

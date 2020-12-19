@@ -13,7 +13,8 @@ public class App {
     private static List<Function> code = new ArrayList<Function>();
     private static Function current_func;
     private static int seq = 0;  // ラベル用シーケンスナンバー
-    private static final String[] argregs = { "rdi", "rsi", "rdx", "rcx", "r8", "r9" };  // 関数引数用レジスタ
+    private static final String[] argregs8  = { "dil", "sil",  "dl",  "cl", "r8b", "r9b" };  // 引数用レジスタ( 8bit)
+    private static final String[] argregs64 = { "rdi", "rsi", "rdx", "rcx",  "r8",  "r9" };  // 引数用レジスタ(64bit)
 
     public static void main(String[] args) {
         if (args.length != 1) {
@@ -52,7 +53,7 @@ public class App {
         if (0 < (token.idx() - current_line.idx())) {
             System.err.printf("%" + (token.idx() - current_line.idx()) + "s", "");
         }
-        System.err.printf("%s ", String.join("", Collections.nCopies(token.len(), "^")));
+        System.err.printf("\033[31m%s\033[0m ", String.join("", Collections.nCopies(token.len(), "^")));
         System.err.printf(fmt, values);
         System.exit(1);
     }
@@ -207,7 +208,7 @@ public class App {
 
     // function = type ident "(" (param ("," param)*)? ")" "{" stmt* "}"
     // param = type ident
-    // type = "int"
+    // type = "int" | "char" | "boolean"
     private static Function function() {
         Function func = new Function();
         current_func = func;
@@ -264,6 +265,7 @@ public class App {
                 }
                 Token tok = expect_ident();
                 if (st.find_var(tok) != null) {
+                    back();
                     error_at("already defined");
                 }
                 if (consume("(")) {
@@ -274,10 +276,10 @@ public class App {
                 if (consume("[")) {
                     int element = expect_number();
                     expect("]");
-                    Obj new_obj = new Obj(tok.str(), type, st.offset() + 8, element);
+                    Obj new_obj = new Obj(tok.str(), type, st.offset() + type.size(), element);
                     st.push(new_obj, element);
                 } else {
-                    Obj new_obj = new Obj(tok.str(), type, st.offset() + 8, 0);
+                    Obj new_obj = new Obj(tok.str(), type, st.offset() + type.size(), 0);
                     st.push(new_obj, 1);
                 }
                 if (!consume("=")) {
@@ -375,8 +377,13 @@ public class App {
         if (consume(TokenKind.Return)) {
             Node return_value = expr();
             if (return_value.type() != current_func.type() && return_value.type() != null) {
-                back();
-                error_at("mismatched return type");
+                if (return_value.type() == Type.Literal) {
+                    return_value.set_type(current_func.type());
+                // TODO: キャスト
+                //} else {
+                //    back();
+                //    error_at("mismatched return type");
+                }
             }
             Node node = Node.new_node(NodeKind.Return, return_value, null);
             expect(";");
@@ -409,11 +416,16 @@ public class App {
                 default: back(); back(); error_at("invalid assign");
             }
             Node rhs = assign();
-            if (lhs.type() != rhs.type() && rhs.type() != null) {
-                back();
-                error_at("mismatched types");
+            if (lhs.type() != rhs.type()) {
+                if (rhs.type() == Type.Literal) {
+                    rhs.set_type(lhs.type());
+                } else {
+                    back();
+                    error_at("mismatched types");
+                }
             }
             lhs = Node.new_node(NodeKind.Assign, lhs, rhs);
+            lhs.set_type(rhs.type());
         }
         return lhs;
     }
@@ -432,9 +444,13 @@ public class App {
                 continue;
             }
             Node rhs = assign();
-            if (lhs.type() != rhs.type() && rhs.type() != null) {
-                back();
-                error_at("mismatched types");
+            if (lhs.type() != rhs.type()) {
+                if (rhs.type() == Type.Literal) {
+                    rhs.set_type(lhs.type());
+                } else {
+                    back();
+                    error_at("mismatched types");
+                }
             }
             cur.set_next(Node.new_node(NodeKind.Assign, lhs, rhs));
             cur = cur.next();
@@ -606,7 +622,7 @@ public class App {
 
         // そうでなければ数値のはず
         Node node = Node.new_node_num(expect_number());
-        node.set_type(Type.Int);
+        node.set_type(Type.Literal);
         return node;
     }
 
@@ -632,7 +648,12 @@ public class App {
         // レジスタから仮引数へ保存する
         int i = 0;
         for (Token param: func.params()) {
-            System.out.printf("    mov [rbp-%d], %s\n", st.find_var(param).offset(), argregs[i++]);
+            Obj val = st.find_var(param);
+            if (val.type().size() == 1) {
+                System.out.printf("    mov [rbp-%d], %s\n", val.offset(), argregs8[i++]);
+            } else {
+                System.out.printf("    mov [rbp-%d], %s\n", val.offset(), argregs64[i++]);
+            }
         }
 
         // 先頭の式から順にコード生成
@@ -670,7 +691,7 @@ public class App {
         System.out.printf("    pop rdi\n");
         System.out.printf("    mov rax, rbp\n");
         System.out.printf("    sub rax, %d\n", node.offset());
-        System.out.printf("    imul rdi, 8\n");
+        System.out.printf("    imul rdi, %d\n", node.type().size());
         System.out.printf("    sub rax, rdi\n");
         System.out.printf("    push rax\n");
     }
@@ -690,13 +711,21 @@ public class App {
             case Var:
                 gen_val(node);
                 System.out.println("    pop rax");
-                System.out.println("    mov rax, [rax]");
+                if (node.type().size() == 1) {
+                    System.out.println("    movsx rax, BYTE PTR [rax]");
+                } else {
+                    System.out.println("    mov rax, [rax]");
+                }
                 System.out.println("    push rax");
                 return;
             case Array:
                 gen_array(node);
                 System.out.println("    pop rax");
-                System.out.println("    mov rax, [rax]");
+                if (node.type().size() == 1) {
+                    System.out.println("    movsx rax, BYTE PTR [rax]");
+                } else {
+                    System.out.println("    mov rax, [rax]");
+                }
                 System.out.println("    push rax");
                 return;
             case Assign:
@@ -707,9 +736,13 @@ public class App {
                     default: error("invalid assign");
                 }
                 gen(node.rhs());
-                System.out.println("    pop rdi");
-                System.out.println("    pop rax");
-                System.out.println("    mov [rax], rdi");
+                System.out.println("    pop rdi");  // rhsの結果
+                System.out.println("    pop rax");  // lhsのアドレス
+                if (node.lhs().type().size() == 1) {
+                    System.out.println("    mov [rax], dil");
+                } else {
+                    System.out.println("    mov [rax], rdi");
+                }
                 System.out.println("    push rdi");
                 return;
             case Block:
@@ -738,7 +771,7 @@ public class App {
                 // 引数6以下は専用のレジスタに格納
                 for (int i = nargs - 1; 0 <= i; --i) {
                     // スタックから引数をレジスタにpop
-                    System.out.printf("    pop %s\n", argregs[i]);
+                    System.out.printf("    pop %s\n", argregs64[i]);
                 }
                 System.out.printf("    call %s\n", node.funcname());
                 System.out.printf("    push rax\n");
