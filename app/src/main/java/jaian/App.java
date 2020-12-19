@@ -227,6 +227,7 @@ public class App {
     }
 
     // declaration = "int" ident ("=" expr)? ("," ident ("=" expr)?)* ";"
+    //             | "int" ident "[" num "]" ";"  // TODO 配列の初期化
     // int a;
     // int a, b;
     // int a = 1;
@@ -234,6 +235,7 @@ public class App {
     // int a, b = 2;
     // int a = 1, b = 2;
     // int a, int b (仮引数)
+    // int a[10]; // 数値リテラルのみ
     private static void declaration() {
         while (!token.at_eof()) {
             // TokenKind.Typeまでスキップ
@@ -258,8 +260,16 @@ public class App {
                     // 関数は無視
                     break;
                 }
-                Obj new_obj = new Obj(tok.str(), type, st.offset() + 8);
-                st.push(new_obj);
+                // 配列
+                if (consume("[")) {
+                    int element = expect_number();
+                    expect("]");
+                    Obj new_obj = new Obj(tok.str(), type, st.offset() + 8, element);
+                    st.push(new_obj, element);
+                } else {
+                    Obj new_obj = new Obj(tok.str(), type, st.offset() + 8, 0);
+                    st.push(new_obj, 1);
+                }
                 if (!consume("=")) {
                     continue;
                 }
@@ -493,7 +503,7 @@ public class App {
         return node;
     }
 
-    // primary = "(" expr ")" | ident | ident func-args? | num | boolean
+    // primary = "(" expr ")" | ident ("[" expr "]")? | ident func-args? | num | boolean
     private static Node primary() {
         // 次のトークンが "(" なら、 "(" expr ")" のはず
         if (consume("(")) {
@@ -509,14 +519,28 @@ public class App {
                 return funccall(tok);
             }
             // そうでなければ変数
-            Node node = Node.new_node(NodeKind.Var, null, null);
             Obj obj = st.find_var(tok);
             if (obj == null) {
                 token = tok;  // 1つ前のトークンへ戻る
                 error_at("cannot find symbol");
             }
-            node.set_offset(obj.offset());
-            return node;
+            // 配列
+            // TODO postfix = primary ("[" expr "]")*
+            if (consume("[")) {
+                if (!obj.is_array()) {
+                    token = tok;  // 1つ前のトークンへ戻る
+                    error_at("not a array");
+                }
+                Node node = Node.new_node(NodeKind.Array, null, null);
+                node.set_element(expr());
+                node.set_offset(obj.offset());
+                expect("]");
+                return node;
+            } else {
+                Node node = Node.new_node(NodeKind.Var, null, null);
+                node.set_offset(obj.offset());
+                return node;
+            }
         }
 
         // boolean型
@@ -581,6 +605,20 @@ public class App {
         System.out.printf("    push rax\n");
     }
 
+    /** 式を左辺値として評価(配列) */
+    private static void gen_array(Node node) {
+        if (node.kind() != NodeKind.Array) {
+            error("not a array");
+        }
+        gen(node.element());
+        System.out.printf("    pop rdi\n");
+        System.out.printf("    mov rax, rbp\n");
+        System.out.printf("    sub rax, %d\n", node.offset());
+        System.out.printf("    imul rdi, 8\n");
+        System.out.printf("    sub rax, rdi\n");
+        System.out.printf("    push rax\n");
+    }
+
     /** コード生成 */
     private static void gen(Node node) {
         switch (node.kind()) {
@@ -599,8 +637,19 @@ public class App {
                 System.out.println("    mov rax, [rax]");
                 System.out.println("    push rax");
                 return;
+            case Array:
+                gen_array(node);
+                System.out.println("    pop rax");
+                System.out.println("    mov rax, [rax]");
+                System.out.println("    push rax");
+                return;
             case Assign:
-                gen_val(node.lhs());
+                // 左辺は変数か配列でなければならない
+                switch (node.lhs().kind()) {
+                    case Var:   gen_val  (node.lhs()); break;
+                    case Array: gen_array(node.lhs()); break;
+                    default: error("invalid assign");
+                }
                 gen(node.rhs());
                 System.out.println("    pop rdi");
                 System.out.println("    pop rax");

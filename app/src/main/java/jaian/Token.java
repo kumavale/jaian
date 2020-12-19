@@ -97,7 +97,7 @@ public class Token {
             }
 
             // 区切り文字
-            if ("+-*/()<>=;{},".indexOf(ch) != -1) {
+            if ("+-*/()<>=;{},[]".indexOf(ch) != -1) {
                 cur = new_token(TokenKind.Punct, cur, idx, 1);
                 continue;
             }

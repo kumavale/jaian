@@ -13,6 +13,7 @@ public enum NodeKind {
     Assign,    /** = */
     Block,     /** "{", "}" */
     Var,       /** 変数 */
+    Array,     /** 配列 */
     Num,       /** 整数 */
     FuncCall,  /** 関数呼び出し */
 

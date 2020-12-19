@@ -47,7 +47,7 @@ echo
 assert  0 'int main() { return 0; }'
 assert 42 'int main() { return 42; }'
 assert 21 'int main() { return 5+20-4; }'
-assert 41 'int main ( ) { return 12 + 34 - 5 ; } '
+assert 41 ' int main ( ) { return 12 + 34 - 5 ; } '
 assert 47 'int main() { return 5+6*7; }'
 assert 15 'int main() { return 5*(9-6); }'
 assert  4 'int main() { return (3+5)/2; }'
@@ -132,6 +132,10 @@ assert 42 'int main() { /**/ /* this is a block comment
 until */ return 42; } /* and here */'
 assert 42 'int main() { // /* this is a line comment
 return 42; /* // block */ }'
+
+assert  6 'int main() { int a[3]; a[0]=1; a[1]=2; a[2]=3; return a[0]+a[1]+a[2]; }'
+assert 15 'int main() { int a, b[99], c; a=4; b[42]=5; c=6; return a+b[42]+c; }'
+assert  2 'int main() { int a[3]; a[0]=2; a[1+1]=a[0]; return a[a[0]]; }'
 
 # Clean out
 rm -f tmp tmp.s func.o

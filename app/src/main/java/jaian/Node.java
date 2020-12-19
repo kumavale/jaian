@@ -53,6 +53,7 @@ public class Node {
     public Node body()       { return this.body; }
     public int val()         { return this.val; }
     public int offset()      { return this.offset; }
+    public Node element()    { return this.body; }
     public String funcname() { return this.funcname; }
     public Node args()       { return this.args; }
 
@@ -65,6 +66,7 @@ public class Node {
     public void set_inc(Node expr)        { this.inc      = expr; }
     public void set_next(Node node)       { this.next     = node; }
     public void set_body(Node stmt)       { this.body     = stmt; }
+    public void set_element(Node stmt)    { this.body     = stmt; }
     public void set_funcname(String name) { this.funcname = name; }
     public void set_args(Node args)       { this.args     = args; }
 }

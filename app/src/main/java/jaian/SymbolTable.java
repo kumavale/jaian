@@ -6,10 +6,12 @@ import java.util.ArrayList;
 /** シンボルテーブル */
 public class SymbolTable {
     List<Obj> objs;  /** 変数リスト */
+    int offset;      /** RBPからのオフセット / 8 */
 
     // コンストラクタ
     public SymbolTable() {
-        this.objs = new ArrayList<Obj>();
+        this.objs   = new ArrayList<Obj>();
+        this.offset = 0;
     }
 
     /** 変数を名前で検索する。見つからなかった場合はnullを返す。 */
@@ -23,13 +25,14 @@ public class SymbolTable {
     }
 
     /** 変数の追加 */
-    public void push(Obj obj) {
+    public void push(Obj obj, int element) {
         this.objs.add(obj);
+        this.offset += element;
     }
 
     /** RBPからのオフセットを返す */
     public int offset() {
-        return this.objs.size() * 8;
+        return this.offset * 8;
     }
 }
 
