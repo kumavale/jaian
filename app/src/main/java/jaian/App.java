@@ -8,8 +8,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 public class App {
-    private static Token token, first;
-    private static SymbolTable st = new SymbolTable();
+    private static Token token;
     private static List<Function> code = new ArrayList<Function>();
     private static Function current_func;
     private static int seq = 0;  // ラベル用シーケンスナンバー
@@ -25,8 +24,7 @@ public class App {
         // トークナイズしてパースする
         // 結果はcodeに保存される
         String src = args[0];
-        first = token = Token.tokenize(src);
-        declaration();  // 変数宣言の処理
+        token = Token.tokenize(src);
         program();
 
         // アセンブリの前半部分を出力
@@ -199,10 +197,8 @@ public class App {
 
     // program = function*
     private static void program() {
-        int i = 0;
-        token = first;
         while (!token.at_eof()) {
-            code.add(function());
+            code.add(function());  // 関数毎にASTを構築
         }
     }
 
@@ -213,15 +209,32 @@ public class App {
         Function func = new Function();
         current_func = func;
         Type return_type = expect_type();
-        Token ident = expect_ident();
+        Token funcname = expect_ident();
         func.set_type(return_type);
-        func.set_name(ident.str());
+        func.set_name(funcname.str());
 
         // 仮引数
         expect("(");
         while (!consume(")")) {
-            if (consume_type() != null) {
-                func.push_param(expect_ident());
+            Type type = consume_type();
+            if (type != null) {
+                // 仮引数の宣言
+                Token ident = expect_ident();
+                Obj val = func.st().find_var(ident);
+                if (val != null) {
+                    back();
+                    error_at("already defined");
+                }
+                if (consume("[")) {
+                    int element = expect_number();  // 数値リテラルのみ
+                    expect("]");
+                    val = new Obj(ident.str(), type, func.st().offset() + type.size(), element, func.st().scope());
+                    func.st().push(val, element);
+                } else {
+                    val = new Obj(ident.str(), type, func.st().offset() + type.size(), 0, func.st().scope());
+                    func.st().push(val, 1);
+                }
+                func.push_param(ident);
             } else {
                 expect(")");
                 break;
@@ -238,56 +251,6 @@ public class App {
             func.push(stmt());
         }
         return func;
-    }
-
-    // declaration = "int" ident ("=" expr)? ("," ident ("=" expr)?)* ";"
-    //             | "int" ident "[" num "]" ";"  // TODO 配列の初期化
-    // int a;
-    // int a, b;
-    // int a = 1;
-    // int a = 1, b;
-    // int a, b = 2;
-    // int a = 1, b = 2;
-    // int a, int b (仮引数)
-    // int a[10]; // 数値リテラルのみ
-    private static void declaration() {
-        while (!token.at_eof()) {
-            // TokenKind.Typeまでスキップ
-            while (true) {
-                if (token.at_eof()) { return; }
-                if (token.is_type()) { break; }
-                consume();
-            }
-            Type type = expect_type();  // Typeトークンを消費
-            do {
-                if (token.is_type()) {
-                    type = consume_type();
-                }
-                Token tok = expect_ident();
-                if (st.find_var(tok) != null) {
-                    back();
-                    error_at("already defined");
-                }
-                if (consume("(")) {
-                    // 関数は無視
-                    break;
-                }
-                // 配列
-                if (consume("[")) {
-                    int element = expect_number();
-                    expect("]");
-                    Obj new_obj = new Obj(tok.str(), type, st.offset() + type.size(), element);
-                    st.push(new_obj, element);
-                } else {
-                    Obj new_obj = new Obj(tok.str(), type, st.offset() + type.size(), 0);
-                    st.push(new_obj, 1);
-                }
-                if (!consume("=")) {
-                    continue;
-                }
-                assign();
-            } while (consume(","));
-        }
     }
 
     // stmt = expr? ";"
@@ -308,6 +271,7 @@ public class App {
 
         // "{" expr* "}"
         if (consume("{")) {
+            current_func.st().scope_in();
             Node head = new Node();
             Node cur = head;
             while (!consume("}")) {
@@ -316,6 +280,7 @@ public class App {
             }
             Node node = Node.new_node(NodeKind.Block, null, null);
             node.set_body(head.next());
+            current_func.st().scope_out();
             return node;
         }
 
@@ -323,7 +288,7 @@ public class App {
         if (consume(TokenKind.If)) {
             Node node = Node.new_node(NodeKind.If, null, null);
             expect("(");
-            Node cond = expr();
+            Node cond = expr(null);
             expect_boolean(cond);
             node.set_cond(cond);
             expect(")");
@@ -338,7 +303,7 @@ public class App {
         if (consume(TokenKind.While)) {
             Node node = Node.new_node(NodeKind.While, null, null);
             expect("(");
-            Node cond = expr();
+            Node cond = expr(null);
             expect_boolean(cond);
             node.set_cond(cond);
             expect(")");
@@ -355,18 +320,18 @@ public class App {
                     Type type = consume_type();
                     node.set_init(assign_declaration(type));
                 } else {
-                    node.set_init(expr());
+                    node.set_init(expr(null));
                 }
                 expect(";");
             }
             if (!consume(";")) {
-                Node cond = expr();
+                Node cond = expr(null);
                 expect_boolean(cond);
                 node.set_cond(cond);
                 expect(";");
             }
             if (!consume(")")) {
-                node.set_inc(expr());
+                node.set_inc(expr(null));
                 expect(")");
             }
             node.set_then(stmt());
@@ -375,7 +340,7 @@ public class App {
 
         // "return" expr ";"
         if (consume(TokenKind.Return)) {
-            Node return_value = expr();
+            Node return_value = expr(null);
             if (return_value.type() != current_func.type() && return_value.type() != null) {
                 if (return_value.type() == Type.Literal) {
                     return_value.set_type(current_func.type());
@@ -396,26 +361,26 @@ public class App {
         }
 
         // expr ";"
-        Node node = expr();
+        Node node = expr(null);
         expect(";");
         return node;
     }
 
     // expr = assign
-    private static Node expr() {
-        return assign();
+    private static Node expr(Type ty) {
+        return assign(ty);
     }
 
     // assign = equality ("=" assign)?
-    private static Node assign() {
-        Node lhs = equality();
+    private static Node assign(Type ty) {
+        Node lhs = equality(ty);
         if (consume("=")) {
             switch (lhs.kind()) {
                 case Var:
                 case Array: break;
                 default: back(); back(); error_at("invalid assign");
             }
-            Node rhs = assign();
+            Node rhs = assign(ty);
             if (lhs.type() != rhs.type()) {
                 if (rhs.type() == Type.Literal) {
                     rhs.set_type(lhs.type());
@@ -438,12 +403,12 @@ public class App {
         Node head = new Node();
         Node cur = head;
         do {
-            Node lhs = equality();
+            Node lhs = equality(type);
             lhs.set_type(type);
             if (!consume("=")) {
                 continue;
             }
-            Node rhs = assign();
+            Node rhs = assign(type);
             if (lhs.type() != rhs.type()) {
                 if (rhs.type() == Type.Literal) {
                     rhs.set_type(lhs.type());
@@ -461,14 +426,14 @@ public class App {
     }
 
     // equality = relational ("==" relational | "!=" relational)*
-    private static Node equality() {
-        Node node = relational();
+    private static Node equality(Type ty) {
+        Node node = relational(ty);
 
         while (true) {
             if (consume("==")) {
-                node = Node.new_node(NodeKind.Eq, node, relational());
+                node = Node.new_node(NodeKind.Eq, node, relational(ty));
             } else if (consume("!=")) {
-                node = Node.new_node(NodeKind.Ne, node, relational());
+                node = Node.new_node(NodeKind.Ne, node, relational(ty));
             } else {
                 return node;
             }
@@ -477,18 +442,18 @@ public class App {
     }
 
     // relational = add ("<" add | "<=" add | ">" add | ">=" add)*
-    private static Node relational() {
-        Node node = add();
+    private static Node relational(Type ty) {
+        Node node = add(ty);
 
         while (true) {
             if (consume("<")) {
-                node = Node.new_node(NodeKind.Lt, node, add());
+                node = Node.new_node(NodeKind.Lt, node, add(ty));
             } else if (consume("<=")) {
-                node = Node.new_node(NodeKind.Le, node, add());
+                node = Node.new_node(NodeKind.Le, node, add(ty));
             } else if (consume(">")) {
-                node = Node.new_node(NodeKind.Lt, add(), node);
+                node = Node.new_node(NodeKind.Lt, add(ty), node);
             } else if (consume(">=")) {
-                node = Node.new_node(NodeKind.Le, add(), node);
+                node = Node.new_node(NodeKind.Le, add(ty), node);
             } else {
                 return node;
             }
@@ -497,17 +462,17 @@ public class App {
     }
 
     // add = mul ("+" mul | "-" mul)*
-    private static Node add() {
-        Node node = mul();
+    private static Node add(Type ty) {
+        Node node = mul(ty);
 
         while (true) {
             if (consume("+")) {
                 Type type = node.type();
-                node = Node.new_node(NodeKind.Add, node, mul());
+                node = Node.new_node(NodeKind.Add, node, mul(ty));
                 node.set_type(type);
             } else if (consume("-")) {
                 Type type = node.type();
-                node = Node.new_node(NodeKind.Sub, node, mul());
+                node = Node.new_node(NodeKind.Sub, node, mul(ty));
                 node.set_type(type);
             } else {
                 return node;
@@ -516,17 +481,17 @@ public class App {
     }
 
     // mul = unary ("*" unary | "/" unary)*
-    private static Node mul() {
-        Node node = unary();
+    private static Node mul(Type ty) {
+        Node node = unary(ty);
 
         while (true) {
             if (consume("*")) {
                 Type type = node.type();
-                node = Node.new_node(NodeKind.Mul, node, unary());
+                node = Node.new_node(NodeKind.Mul, node, unary(ty));
                 node.set_type(type);
             } else if (consume("/")) {
                 Type type = node.type();
-                node = Node.new_node(NodeKind.Div, node, unary());
+                node = Node.new_node(NodeKind.Div, node, unary(ty));
                 node.set_type(type);
             } else {
                 return node;
@@ -535,17 +500,17 @@ public class App {
     }
 
     // unary = ("+" | "-")? unary
-    private static Node unary() {
+    private static Node unary(Type ty) {
         if (consume("+")) {
-            return unary();
+            return unary(ty);
         }
         if (consume("-")) {
-            Node unary = unary();
+            Node unary = unary(ty);
             Node node = Node.new_node(NodeKind.Sub, Node.new_node_num(0), unary);
             node.set_type(unary.type());
             return node;
         }
-        return primary();
+        return primary(ty);
     }
 
     // funccall = ident "(" (assign ("," assign)*)? ")"
@@ -556,7 +521,7 @@ public class App {
             if (cur != head) {
                 consume(",");
             }
-            cur.set_next(assign());
+            cur.set_next(assign(null));
             cur = cur.next();
         }
         Node node = Node.new_node(NodeKind.FuncCall, null, null);
@@ -566,10 +531,10 @@ public class App {
     }
 
     // primary = "(" expr ")" | ident ("[" expr "]")? | ident func-args? | num | boolean
-    private static Node primary() {
+    private static Node primary(Type ty) {
         // 次のトークンが "(" なら、 "(" expr ")" のはず
         if (consume("(")) {
-            Node node = expr();
+            Node node = expr(ty);
             expect(")");
             return node;
         }
@@ -581,8 +546,24 @@ public class App {
                 return funccall(ident);
             }
             // そうでなければ変数
-            Obj val = st.find_var(ident);
-            if (val == null) {
+            Obj val = current_func.st().find_var(ident);
+            // tyがnullでなければ宣言文である
+            if (ty != null) {
+                if (val != null && val.scope() == current_func.st().scope()) {
+                    back();
+                    error_at("already defined");
+                }
+                // valがnullでなくても、スコープが違うなら新たに宣言する
+                if (consume("[")) {
+                    int element = expect_number();  // 数値リテラルのみ
+                    expect("]");
+                    val = new Obj(ident.str(), ty, current_func.st().offset() + ty.size(), element, current_func.st().scope());
+                    current_func.st().push(val, element);
+                } else {
+                    val = new Obj(ident.str(), ty, current_func.st().offset() + ty.size(), 0, current_func.st().scope());
+                    current_func.st().push(val, 1);
+                }
+            } else if (val == null) {
                 back();
                 error_at("cannot find symbol");
             }
@@ -594,7 +575,7 @@ public class App {
                     error_at("not a array");
                 }
                 Node node = Node.new_node(NodeKind.Array, null, null);
-                node.set_element(expr());
+                node.set_element(expr(ty));
                 node.set_offset(val.offset());
                 node.set_type(val.type());
                 expect("]");
@@ -643,12 +624,12 @@ public class App {
         // 変数の領域を確保する
         System.out.println("    push rbp");
         System.out.println("    mov rbp, rsp");
-        System.out.printf("    sub rsp, %d\n", st.offset());
+        System.out.printf("    sub rsp, %d\n", func.st().offset());
 
         // レジスタから仮引数へ保存する
         int i = 0;
         for (Token param: func.params()) {
-            Obj val = st.find_var(param);
+            Obj val = func.st().find_var(param);
             if (val.type().size() == 1) {
                 System.out.printf("    mov [rbp-%d], %s\n", val.offset(), argregs8[i++]);
             } else {

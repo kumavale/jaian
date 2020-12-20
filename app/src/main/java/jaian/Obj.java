@@ -2,18 +2,19 @@ package jaian;
 
 /** ローカル変数の型 */
 public class Obj {
-    String name;       /** 変数の名前 */
-    Type type;         /** 変数の型 */
-    int offset;        /** RBPからのオフセット */
-    int elements;      /** 要素数 */ // 配列でない場合: 0
-    //int scope;    /** スコープレベル */ TODO
+    String name;   /** 変数の名前 */
+    Type type;     /** 変数の型 */
+    int offset;    /** RBPからのオフセット */
+    int elements;  /** 要素数 */ // 配列でない場合: 0
+    int scope;     /** スコープレベル */
 
     // コンストラクタ
-    public Obj(String name, Type type, int offset, int elements) {
+    public Obj(String name, Type type, int offset, int elements, int scope) {
         this.name     = name;
         this.type     = type;
         this.offset   = offset;
         this.elements = elements;
+        this.scope    = scope;
     }
 
     /** 変数の長さを返す。 */
@@ -31,5 +32,6 @@ public class Obj {
     public Type type()    { return this.type; }
     public int offset()   { return this.offset; }
     public int elements() { return this.elements; }
+    public int scope()    { return this.scope; }
 }
 

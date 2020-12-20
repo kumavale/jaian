@@ -24,7 +24,7 @@ function assert() {
 
     gradle run --quiet --no-rebuild --args="'$input'" > tmp.s
     if [ "$?" -eq 1 ]; then
-        echo -e "'$input' => $actual ... \033[31mFAILED\033[0m"
+        echo -e "'$input' ... \033[31mFAILED\033[0m"
         NGCNT=$((NGCNT+1))
         return 1;
     fi
@@ -149,6 +149,9 @@ assert  4 'int main() { char x[10]; x[0]=1; x[1]=2; x[2]=3; return x[0]+x[2]; }'
 assert  5 'int main() { char x[10]; x[5]=5; return x[5]; }'
 assert 11 'int main() { char x=5; int a=7; char y=6; int b=8; return x+y; }'
 assert 15 'int main() { char x=5; int a=7; char y=6; int b=8; return a+b; }'
+
+assert 42 'int main() { return 42; } int foo(int a) { int b; return 0; } int bar(int a) { int b; return 0; }'
+assert  6 'int main() { int a=2,b; { int a=4; b=a; } return a+b; }'
 
 # Clean out
 rm -f tmp tmp.s func.o

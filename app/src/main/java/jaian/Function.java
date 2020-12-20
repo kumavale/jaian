@@ -9,12 +9,14 @@ public class Function {
     private Type type;              /** 戻り値の型 */
     private List<Token> params;     /** 仮引数 */
     private List<Node> statements;  /** 関数内の式や文 */
+    private SymbolTable st;         /** ローカル変数のシンボルテーブル */
 
     // コンストラクタ
     public Function() {
         this.type       = Type.Int;
         this.params     = new ArrayList<Token>();
         this.statements = new ArrayList<Node>();
+        this.st         = new SymbolTable();
     }
 
     // Getters
@@ -22,6 +24,7 @@ public class Function {
     public Type type()             { return this.type; }
     public List<Token> params()    { return this.params; }
     public List<Node> statements() { return this.statements; }
+    public SymbolTable st()        { return this.st; }
 
     // Setters
     public void set_name(String name) { this.name = name; }
