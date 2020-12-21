@@ -8,10 +8,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 public class App {
-    private static Token token;
-    private static List<Function> code = new ArrayList<Function>();
-    private static Function current_func;
-    private static int seq = 0;  // ラベル用シーケンスナンバー
+    private static Token token;                                      // 現在注目しているトークン
+    private static SymbolTable global_st = new SymbolTable();        // グローバル変数用のシンボルテーブル
+    private static List<Function> code = new ArrayList<Function>();  // 関数毎のコード
+    private static Function current_func;                            // 現在処理中のFunction
+    private static int seq = 0;                                      // ラベル用シーケンスナンバー
     private static final String[] argregs8  = { "dil", "sil",  "dl",  "cl", "r8b", "r9b" };  // 引数用レジスタ( 8bit)
     private static final String[] argregs64 = { "rdi", "rsi", "rdx", "rcx",  "r8",  "r9" };  // 引数用レジスタ(64bit)
 
@@ -29,6 +30,9 @@ public class App {
 
         // アセンブリの前半部分を出力
         System.out.println(".intel_syntax noprefix");
+
+        // グローバル変数のコード生成
+        gen_data();
 
         // 各関数毎にコード生成
         for (int i = 0; i < code.size(); ++i) {
@@ -198,8 +202,40 @@ public class App {
     // program = function*
     private static void program() {
         while (!token.at_eof()) {
-            code.add(function());  // 関数毎にASTを構築
+            if (is_function()) {
+                code.add(function());  // 関数毎にASTを構築
+            } else {
+                // グローバル変数の宣言
+                // TODO 初期化
+                Type type = consume_type();
+                do {
+                    Token ident = expect_ident();
+                    Obj val = global_st.find_var(ident);
+                    if (val != null) {
+                        back();
+                        error_at("already defined");
+                    }
+                    if (consume("[")) {
+                        int element = expect_number();  // 数値リテラルのみ
+                        expect("]");
+                        val = new Obj(ident.str(), type, global_st.offset() + type.size(), element, global_st.scope());
+                        val.set_is_global();
+                        global_st.push(val, element);
+                    } else {
+                        val = new Obj(ident.str(), type, global_st.offset() + type.size(), 0, global_st.scope());
+                        val.set_is_global();
+                        global_st.push(val, 1);
+                    }
+                } while (consume(","));
+                expect(";");
+            }
         }
+    }
+
+    /** 現在のトークンが関数の始まりなのかを返す。 */
+    private static boolean is_function() {
+        return token.is_type() && token.next() != null && token.next().kind() == TokenKind.Ident
+            && token.next().next() != null && token.next().next().str().equals("(");
     }
 
     // function = type ident "(" (param ("," param)*)? ")" "{" stmt* "}"
@@ -564,8 +600,12 @@ public class App {
                     current_func.st().push(val, 1);
                 }
             } else if (val == null) {
-                back();
-                error_at("cannot find symbol");
+                // ローカル変数から見つからなかったら、グローバル変数から探す
+                val = global_st.find_var(ident);
+                if (val == null) {
+                    back();
+                    error_at("cannot find symbol");
+                }
             }
             // 配列
             // TODO postfix = primary ("[" expr "]")*
@@ -576,14 +616,15 @@ public class App {
                 }
                 Node node = Node.new_node(NodeKind.Array, null, null);
                 node.set_element(expr(ty));
-                node.set_offset(val.offset());
                 node.set_type(val.type());
+                node.set_variable(val);
                 expect("]");
                 return node;
             } else {
                 Node node = Node.new_node(NodeKind.Var, null, null);
                 node.set_offset(val.offset());
                 node.set_type(val.type());
+                node.set_variable(val);
                 return node;
             }
         }
@@ -610,6 +651,16 @@ public class App {
     /** 連番をインクリメントして返す */
     private static int sequence() {
         return seq++;
+    }
+
+    /** グローバル変数用 .dataセクション コード生成 */
+    private static void gen_data() {
+        for (Obj obj: global_st.first()) {
+            System.out.printf("    .data\n");
+            System.out.printf("    .globl %s\n", obj.name());
+            System.out.printf("%s:\n", obj.name());
+            System.out.printf("    .zero %d\n", obj.type().size() * obj.elements());
+        }
     }
 
     /** 関数単位のコード生成 */
@@ -658,8 +709,12 @@ public class App {
         if (node.kind() != NodeKind.Var) {
             error("not a variable");
         }
-        System.out.printf("    mov rax, rbp\n");
-        System.out.printf("    sub rax, %d\n", node.offset());
+        if (node.variable().is_local()) {
+            System.out.printf("    mov rax, rbp\n");
+            System.out.printf("    sub rax, %d\n", node.offset());
+        } else {
+            System.out.printf("    lea rax, %s[rip]\n", node.variable().name());
+        }
         System.out.printf("    push rax\n");
     }
 
@@ -669,11 +724,16 @@ public class App {
             error("not a array");
         }
         gen(node.element());
-        System.out.printf("    pop rdi\n");
-        System.out.printf("    mov rax, rbp\n");
-        System.out.printf("    sub rax, %d\n", node.offset());
-        System.out.printf("    imul rdi, %d\n", node.type().size());
-        System.out.printf("    sub rax, rdi\n");
+        System.out.printf("    pop rdx\n");
+        System.out.printf("    imul rdx, %d\n", node.type().size());
+        if (node.variable().is_local()) {
+            System.out.printf("    mov rax, rbp\n");
+            System.out.printf("    sub rax, %d\n", node.offset());
+            System.out.printf("    sub rax, rdx\n");
+        } else {
+            System.out.printf("    lea rax, %s[rip]\n", node.variable().name());
+            System.out.printf("    add rax, rdx\n");
+        }
         System.out.printf("    push rax\n");
     }
 

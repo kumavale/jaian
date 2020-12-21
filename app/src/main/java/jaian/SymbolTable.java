@@ -53,6 +53,11 @@ public class SymbolTable {
         }
     }
 
+    /** objsの最初の要素を返す。 */
+    public List<Obj> first() {
+        return this.objs.get(0);
+    }
+
     // Getters
     public int offset() { return this.offset; }
     public int scope()  { return this.scope; }

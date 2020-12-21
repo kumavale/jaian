@@ -2,11 +2,12 @@ package jaian;
 
 /** ローカル変数の型 */
 public class Obj {
-    String name;   /** 変数の名前 */
-    Type type;     /** 変数の型 */
-    int offset;    /** RBPからのオフセット */
-    int elements;  /** 要素数 */ // 配列でない場合: 0
-    int scope;     /** スコープレベル */
+    String name;       /** 変数の名前 */
+    Type type;         /** 変数の型 */
+    int offset;        /** RBPからのオフセット */
+    int elements;      /** 要素数 */ // 配列でない場合: 0
+    int scope;         /** スコープレベル */
+    boolean is_local;  /** ローカル変数なのかグローバル変数なのか */
 
     // コンストラクタ
     public Obj(String name, Type type, int offset, int elements, int scope) {
@@ -15,6 +16,7 @@ public class Obj {
         this.offset   = offset;
         this.elements = elements;
         this.scope    = scope;
+        this.is_local = true;
     }
 
     /** 変数の長さを返す。 */
@@ -27,11 +29,17 @@ public class Obj {
         return 0 < this.elements;
     }
 
+    /** グローバル変数として宣言 */
+    public void set_is_global() {
+        this.is_local = false;
+    }
+
     // Getters
-    public String name()  { return this.name; }
-    public Type type()    { return this.type; }
-    public int offset()   { return this.offset; }
-    public int elements() { return this.elements; }
-    public int scope()    { return this.scope; }
+    public String name()      { return this.name; }
+    public Type type()        { return this.type; }
+    public int offset()       { return this.offset; }
+    public int elements()     { return this.elements <= 0 ? 1 : this.elements; }
+    public int scope()        { return this.scope; }
+    public boolean is_local() { return this.is_local; }
 }
 

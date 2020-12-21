@@ -23,7 +23,7 @@ function assert() {
     input="$2"
 
     gradle run --quiet --no-rebuild --args="'$input'" > tmp.s
-    if [ "$?" -eq 1 ]; then
+    if [ "$?" -ne "0" ]; then
         echo -e "'$input' ... \033[31mFAILED\033[0m"
         NGCNT=$((NGCNT+1))
         return 1;
@@ -152,6 +152,17 @@ assert 15 'int main() { char x=5; int a=7; char y=6; int b=8; return a+b; }'
 
 assert 42 'int main() { return 42; } int foo(int a) { int b; return 0; } int bar(int a) { int b; return 0; }'
 assert  6 'int main() { int a=2,b; { int a=4; b=a; } return a+b; }'
+
+assert  0 'int x; int main() { return x; }'
+assert  3 'int x; int main() { x=3; return x; }'
+assert  7 'int x; int y; int main() { x=3; y=4; return x+y; }'
+assert  7 'int x, y; int main() { x=3; y=4; return x+y; }'
+assert  0 'int x[4]; int main() { x[0]=0; x[1]=1; x[2]=2; x[3]=3; return x[0]; }'
+assert  1 'int x[4]; int main() { x[0]=0; x[1]=1; x[2]=2; x[3]=3; return x[1]; }'
+assert  2 'int x[4]; int main() { x[0]=0; x[1]=1; x[2]=2; x[3]=3; return x[2]; }'
+assert  3 'int x[4]; int main() { x[0]=0; x[1]=1; x[2]=2; x[3]=3; return x[3]; }'
+assert 16 'int x[4]; int main() { int y[4]; x[1]=9; y[1]=7; return x[1]+y[1]; }'
+assert  8 'int x; int main() { int y=8; return x+y; }'
 
 # Clean out
 rm -f tmp tmp.s func.o
