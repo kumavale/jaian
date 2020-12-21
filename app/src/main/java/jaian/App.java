@@ -349,6 +349,7 @@ public class App {
 
         // "for" "(" (declaration|expr)? ";" expr? ";" expr? ")" stmt
         if (consume(TokenKind.For)) {
+            current_func.st().scope_in();
             Node node = Node.new_node(NodeKind.For, null, null);
             expect("(");
             if (!consume(";")) {
@@ -371,6 +372,7 @@ public class App {
                 expect(")");
             }
             node.set_then(stmt());
+            current_func.st().scope_out();
             return node;
         }
 
