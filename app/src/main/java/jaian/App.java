@@ -10,6 +10,7 @@ import java.util.Collections;
 public class App {
     private static Token token;                                      // 現在注目しているトークン
     private static SymbolTable global_st = new SymbolTable();        // グローバル変数用のシンボルテーブル
+    private static SymbolTable func_st   = new SymbolTable();        // 関数名用のシンボルテーブル
     private static List<Function> code = new ArrayList<Function>();  // 関数毎のコード
     private static Function current_func;                            // 現在処理中のFunction
     private static int seq = 0;                                      // ラベル用シーケンスナンバー
@@ -248,6 +249,12 @@ public class App {
         Token funcname = expect_ident();
         func.set_type(return_type);
         func.set_name(funcname.str());
+
+        if (func_st.find_var(funcname) != null) {
+            back();
+            error_at("already defined");
+        }
+        func_st.push(new Obj(funcname.str(), return_type, 0, 0, 0), 0);
 
         // 仮引数
         expect("(");
