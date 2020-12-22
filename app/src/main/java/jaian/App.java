@@ -6,6 +6,11 @@ package jaian;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Collections;
+//import java.io.IOException;
+//import java.nio.charset.Charset;
+//import java.nio.file.Files;
+//import java.nio.file.Paths;
+//import java.util.stream.Collectors;
 
 public class App {
     private static Token token;                                      // 現在注目しているトークン
@@ -23,9 +28,12 @@ public class App {
             System.exit(1);
         }
 
+        // コマンドライン引数でファイル名を指定して、それを読み込む
+        // 1ファイルのみ
+        String src = args[0]; // read_file(args[0]); // TODO 実装済。テストが整ったらファイル読み込みに変更する
+
         // トークナイズしてパースする
         // 結果はcodeに保存される
-        String src = args[0];
         token = Token.tokenize(src);
         program();
 
@@ -60,6 +68,17 @@ public class App {
         System.err.printf(fmt, values);
         System.exit(1);
     }
+
+    ///** パスから文字列を読み込み、一つのStringにして返す */
+    //private static String read_file(final String path) {
+    //    try {
+    //        return Files.lines(Paths.get(path), Charset.forName("UTF-8"))
+    //            .collect(Collectors.joining(System.getProperty("line.separator")));
+    //    } catch(IOException e) {
+    //        error("%s", e);
+    //        return "";
+    //    }
+    //}
 
     /**
      * 次のトークンが期待している記号の時には、トークンを1つ読み進めてtrueを返す。

@@ -138,6 +138,9 @@ assert 42 'int main() { /**/ /* this is a block comment
 until */ return 42; } /* and here */'
 assert 42 'int main() { // /* this is a line comment
 return 42; /* // block */ }'
+assert 42 'int main() { /* this is a line comment
+/* block in block */*/ return 42; }'
+assert 42 'int main() { /*/* /* comment */ */*/ return 42; }'
 
 assert  6 'int main() { int a[3]; a[0]=1; a[1]=2; a[2]=3; return a[0]+a[1]+a[2]; }'
 assert 15 'int main() { int a, b[99], c; a=4; b[42]=5; c=6; return a+b[42]+c; }'
@@ -172,6 +175,7 @@ assert 98 'int main() { return "abc"[1]; }'
 assert 99 'int main() { return "abc"[2]; }'
 assert  0 'int main() { return "abc"[3]; }'
 assert  0 'int main() { printf("[abc]"); return 0; }'
+assert  5 'int main() { printf("[2+3=%d]", 2+3); return 5; }'
 assert  0 'int main() { if ("abc" == "abc") return 0; return 1; }'  # アドレスの比較
 assert  1 'int main() { if ("abc" == "xyz") return 0; return 1; }'  # アドレスの比較
 

@@ -46,8 +46,21 @@ public class Token {
 
             // ブロックコメントをスキップ
             if (src.startsWith("/*", idx)) {
-                ++idx;
-                while (!src.startsWith("*/", ++idx));
+                int scope = 0;
+                idx += 2;
+                while (idx < src.length()) {
+                    if (src.startsWith("*/", idx)) {
+                        if (scope <= 0) { break; }
+                        --scope;
+                        idx += 2;
+                        continue;
+                    }
+                    if (src.startsWith("/*", idx)) {
+                        ++scope;
+                        ++idx;
+                    }
+                    ++idx;
+                }
                 ++idx;
                 continue;
             }
