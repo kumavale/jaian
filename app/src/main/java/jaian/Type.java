@@ -3,6 +3,7 @@ package jaian;
 /** 型の種類 */
 public enum Type {
     Literal,  /** 数値リテラル */  // IntかCharになる
+    String,   /** 文字列リテラル */
     Int,      /** "int" */
     Char,     /** "char" */
     Boolean,  /** "boolean" */
@@ -14,6 +15,7 @@ public enum Type {
             case Literal: return 8;
             case Int:     return 8;
             case Char:    return 1;
+            case String:  return 1;
             case Boolean: return 1;
             default:
                 App.error("unreachable");

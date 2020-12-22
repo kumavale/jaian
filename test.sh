@@ -7,6 +7,7 @@ NGCNT=0
 # C function
 cat << EOF | gcc -xc -c -o func.o -
     #include <assert.h>
+    #include <stdio.h>
     int ret0() { return 0; }
     int ret42() { return 42; }
     int retx(int x) { return x; }
@@ -164,6 +165,15 @@ assert  2 'int x[4]; int main() { x[0]=0; x[1]=1; x[2]=2; x[3]=3; return x[2]; }
 assert  3 'int x[4]; int main() { x[0]=0; x[1]=1; x[2]=2; x[3]=3; return x[3]; }'
 assert 16 'int x[4]; int main() { int y[4]; x[1]=9; y[1]=7; return x[1]+y[1]; }'
 assert  8 'int x; int main() { int y=8; return x+y; }'
+
+assert  0 'int main() { return ""[0]; }'
+assert 97 'int main() { return "abc"[0]; }'
+assert 98 'int main() { return "abc"[1]; }'
+assert 99 'int main() { return "abc"[2]; }'
+assert  0 'int main() { return "abc"[3]; }'
+assert  0 'int main() { printf("[abc]"); return 0; }'
+assert  0 'int main() { if ("abc" == "abc") return 0; return 1; }'  # アドレスの比較
+assert  1 'int main() { if ("abc" == "xyz") return 0; return 1; }'  # アドレスの比較
 
 # Clean out
 rm -f tmp tmp.s func.o

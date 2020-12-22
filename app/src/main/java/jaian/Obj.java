@@ -8,6 +8,7 @@ public class Obj {
     int elements;      /** 要素数 */ // 配列でない場合: 0
     int scope;         /** スコープレベル */
     boolean is_local;  /** ローカル変数なのかグローバル変数なのか */
+    String literal;    /** 文字列リテラルの場合、その文字列が入る */
 
     // コンストラクタ
     public Obj(String name, Type type, int offset, int elements, int scope) {
@@ -41,5 +42,9 @@ public class Obj {
     public int elements()     { return this.elements <= 0 ? 1 : this.elements; }
     public int scope()        { return this.scope; }
     public boolean is_local() { return this.is_local; }
+    public String literal()   { return this.literal; }
+
+    // Setters
+    public void set_literal(String literal) { this.literal = literal; }
 }
 

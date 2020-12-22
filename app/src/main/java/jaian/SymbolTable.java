@@ -8,13 +8,15 @@ public class SymbolTable {
     List<List<Obj>> objs;  /** スコープ毎の変数リスト */
     int offset;            /** RBPからのオフセット */
     int scope;             /** スコープの深さ */
+    int label_seq;         /** 文字列リテラル用のラベルのシーケンスナンバー */
 
     // コンストラクタ
     public SymbolTable() {
-        this.objs   = new ArrayList<List<Obj>>();
+        this.objs = new ArrayList<List<Obj>>();
         this.objs.add(new ArrayList<Obj>());
-        this.offset = 0;
-        this.scope  = 0;
+        this.offset    = 0;
+        this.scope     = 0;
+        this.label_seq = 0;
     }
 
     /** 変数を名前で検索する。見つからなかった場合はnullを返す。 */
@@ -24,6 +26,19 @@ public class SymbolTable {
                 if (obj.len() == tok.len() && obj.name().equals(tok.str())) {
                     return obj;
                 }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * global_st専用。既存の文字列リテラルがあるならそのObjを返す。
+     * 見つからなかった場合はnulllを返す。
+     */
+    public Obj find_literal(String str) {
+        for (Obj obj: this.first()) {
+            if (str.equals(obj.literal())) {
+                return obj;
             }
         }
         return null;
@@ -58,8 +73,14 @@ public class SymbolTable {
         return this.objs.get(0);
     }
 
+    /** ラベル用シーケンスナンバーをインクリメントする */
+    public void inc_label_seq() {
+        ++this.label_seq;
+    }
+
     // Getters
-    public int offset() { return this.offset; }
-    public int scope()  { return this.scope; }
+    public int offset()    { return this.offset; }
+    public int scope()     { return this.scope; }
+    public int label_seq() { return this.label_seq; }
 }
 

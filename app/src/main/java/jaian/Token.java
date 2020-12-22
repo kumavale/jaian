@@ -62,6 +62,14 @@ public class Token {
                 continue;
             }
 
+            // 文字列リテラル
+            if (ch == '"') {
+                int begin = idx + 1;
+                while (src.charAt(++idx) != '"');
+                cur = new_token(TokenKind.String, cur, begin, idx - begin);
+                continue;
+            }
+
             // 識別子 もしくは 予約語
             // アルファベットから始まり、アルファベットか数字かアンダースコアが続く
             if (Character.isAlphabetic(ch)) {

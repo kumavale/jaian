@@ -14,6 +14,7 @@ public enum NodeKind {
     Block,     /** "{", "}" */
     Var,       /** 変数 */
     Array,     /** 配列 */
+    Addr,      /** アドレス */
     Num,       /** 整数 */
     FuncCall,  /** 関数呼び出し */
 

@@ -209,6 +209,9 @@ public class App {
                 // グローバル変数の宣言
                 // TODO 初期化
                 Type type = consume_type();
+                if (type == null) {
+                    error_at("invalid type");
+                }
                 do {
                     Token ident = expect_ident();
                     Obj val = global_st.find_var(ident);
@@ -219,11 +222,11 @@ public class App {
                     if (consume("[")) {
                         int element = expect_number();  // 数値リテラルのみ
                         expect("]");
-                        val = new Obj(ident.str(), type, global_st.offset() + type.size(), element, global_st.scope());
+                        val = new Obj(ident.str(), type, 0, element, 0);
                         val.set_is_global();
                         global_st.push(val, element);
                     } else {
-                        val = new Obj(ident.str(), type, global_st.offset() + type.size(), 0, global_st.scope());
+                        val = new Obj(ident.str(), type, 0, 0, 0);
                         val.set_is_global();
                         global_st.push(val, 1);
                     }
@@ -575,7 +578,7 @@ public class App {
         return node;
     }
 
-    // primary = "(" expr ")" | ident ("[" expr "]")? | ident func-args? | num | boolean
+    // primary = "(" expr ")" | ident ("[" expr "]")? | ident func-args? | str | num | boolean
     private static Node primary(Type ty) {
         // 次のトークンが "(" なら、 "(" expr ")" のはず
         if (consume("(")) {
@@ -638,14 +641,38 @@ public class App {
             }
         }
 
-        // boolean型
-        if (token.kind() == TokenKind.True) {
+        // 文字列リテラル
+        if (token.kind() == TokenKind.String) {
+            Obj literal = global_st.find_literal(token.str());
+            if (literal == null) {
+                String label_name = String.format(".LC%d", global_st.label_seq());
+                global_st.inc_label_seq();
+                literal = new Obj(label_name, Type.String, 0, token.str().length(), 0);
+                literal.set_literal(token.str());
+                literal.set_is_global();
+                global_st.push(literal, 0);
+            }
             consume();
+            Node node;
+            if (consume("[")) {
+                node = Node.new_node(NodeKind.Array, null, null);
+                node.set_element(expr(ty));
+                expect("]");
+            } else {
+                node = Node.new_node(NodeKind.Addr, null, null);
+                node.set_element(Node.new_node_num(0));
+            }
+            node.set_variable(literal);
+            node.set_type(Type.Char);
+            return node;
+        }
+
+        // boolean型
+        if (consume(TokenKind.True)) {
             Node node = Node.new_node(NodeKind.True, null, null);
             node.set_type(Type.Boolean);
             return node;
-        } else if (token.kind() == TokenKind.False) {
-            consume();
+        } else if (consume(TokenKind.False)) {
             Node node = Node.new_node(NodeKind.False, null, null);
             node.set_type(Type.Boolean);
             return node;
@@ -668,7 +695,13 @@ public class App {
             System.out.printf("    .data\n");
             System.out.printf("    .globl %s\n", obj.name());
             System.out.printf("%s:\n", obj.name());
-            System.out.printf("    .zero %d\n", obj.type().size() * obj.elements());
+            if (obj.type() == Type.Int) {
+                System.out.printf("    .zero %d\n", obj.type().size() * obj.elements());
+            } else if (obj.type() == Type.String) {
+                System.out.printf("    .string \"%s\"\n", obj.literal());
+            } else {
+                error("unreachable");
+            }
         }
     }
 
@@ -677,7 +710,8 @@ public class App {
         current_func = func;
 
         // 関数のラベル
-        System.out.printf(".globl %s\n", func.name());
+        System.out.printf("    .globl %s\n", func.name());
+        System.out.printf("    .text\n");
         System.out.printf("%s:\n", func.name());
 
         // プロローグ
@@ -729,9 +763,6 @@ public class App {
 
     /** 式を左辺値として評価(配列) */
     private static void gen_array(Node node) {
-        if (node.kind() != NodeKind.Array) {
-            error("not a array");
-        }
         gen(node.element());
         System.out.printf("    pop rdx\n");
         System.out.printf("    imul rdx, %d\n", node.type().size());
@@ -778,6 +809,9 @@ public class App {
                 }
                 System.out.println("    push rax");
                 return;
+            case Addr:
+                gen_array(node);
+                return;
             case Assign:
                 // 左辺は変数か配列でなければならない
                 switch (node.lhs().kind()) {
@@ -823,6 +857,7 @@ public class App {
                     // スタックから引数をレジスタにpop
                     System.out.printf("    pop %s\n", argregs64[i]);
                 }
+                System.out.printf("    mov al, 0\n");
                 System.out.printf("    call %s\n", node.funcname());
                 System.out.printf("    push rax\n");
                 return;
