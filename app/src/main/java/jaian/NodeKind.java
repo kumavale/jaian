@@ -21,6 +21,7 @@ public enum NodeKind {
     // Keywords
     If,      /** "if" */
     Else,    /** "else" */
+    Do,      /** "do" */
     While,   /** "while" */
     For,     /** "for" */
     Return,  /** "return" */

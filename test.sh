@@ -108,6 +108,10 @@ assert  4 'int main() { int i=5; int j=0; while(0<(i=i-1)) j=j+1; return j; }'
 assert  1 'int main() { while(false) return 0; return 1; }'
 assert 55 'int main() { int i=0; int j=0; while(i<=10) {j=i+j; i=i+1; } return j; }'
 
+assert  5 'int main() { int i=0; do { i=i+1; } while(i<5); return i; }'
+assert 42 'int main() { int i; do { i=42; } while(false); return i; }'
+assert 42 'int main() { do { return 42; } while(true); return 0; }'
+
 assert 10 'int main() { int j=0; for(int i=0; i<5; i=i+1) j=j+i; return j; }'
 assert 42 'int main() { for(int i=42; i<100; i=i+1) return i; return 21; }'
 assert 42 'int main() { for(int i=42, j; true;) { j = i; return j; } return 21; }'

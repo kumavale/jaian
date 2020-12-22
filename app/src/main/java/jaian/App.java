@@ -322,6 +322,7 @@ public class App {
     //      | declaration
     //      | "{" expr* "}"
     //      | "if" "(" expr ")" stmt ("else" stmt)?
+    //      | "do" stmt "while" "(" expr ")"
     //      | "while" "(" expr ")" stmt
     //      | "for" "(" (declaration|expr)? ";" expr? ";" expr? ")" stmt
     //      | "return" expr ";"
@@ -361,6 +362,21 @@ public class App {
             if (consume(TokenKind.Else)) {
                 node.set_els(stmt());
             }
+            return node;
+        }
+
+        // "do" stmt "while" "(" expr ")"
+        if (consume(TokenKind.Do)) {
+            Node node = Node.new_node(NodeKind.Do, null, null);
+            node.set_then(stmt());
+            if (!consume(TokenKind.While)) {
+                error_at("expect \"while\", but got \"%s\"", token.str());
+            }
+            expect("(");
+            Node cond = expr(null);
+            expect_boolean(cond);
+            node.set_cond(cond);
+            expect(")");
             return node;
         }
 
@@ -897,6 +913,16 @@ public class App {
                     gen(node.then());
                     System.out.printf(".L.end.%d:\n", count);
                 }
+                return;
+            }
+            case Do: {
+                int count = sequence();
+                System.out.printf(".L.begin.%d:\n", count);
+                gen(node.then());
+                gen(node.cond());
+                System.out.println("    pop rax");
+                System.out.println("    cmp rax, 0");
+                System.out.printf("    jne .L.begin.%d\n", count);
                 return;
             }
             case While: {
