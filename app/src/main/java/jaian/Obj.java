@@ -43,8 +43,10 @@ public class Obj {
     public int scope()        { return this.scope; }
     public boolean is_local() { return this.is_local; }
     public String literal()   { return this.literal; }
+    public int params()       { return this.offset; }  // 関数用
 
     // Setters
     public void set_literal(String literal) { this.literal = literal; }
+    public void set_params(int size)        { this.offset  = size; }  // 関数用
 }
 

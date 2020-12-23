@@ -318,7 +318,6 @@ public class App {
             back();
             error_at("already defined");
         }
-        func_st.push(new Obj(funcname.str(), return_type, 0, 0, 0), 0);
 
         // 仮引数
         expect("(");
@@ -351,6 +350,10 @@ public class App {
                 break;
             }
         }
+
+        Obj func_obj = new Obj(funcname.str(), return_type, 0, 0, 0);
+        func_obj.set_params(func.params().size());
+        func_st.push(func_obj, 0);
 
         // 中身
         expect("{");
@@ -686,18 +689,25 @@ public class App {
     }
 
     // funccall = ident "(" (assign ("," assign)*)? ")"
-    private static Node funccall(Token tok) {
+    private static Node funccall(Token funcname) {
         Node head = new Node();
         Node cur = head;
+        int params = 0;
         while (!consume(")")) {
+            ++params;
             if (cur != head) {
                 consume(",");
             }
             cur.set_next(assign(null));
             cur = cur.next();
         }
+        Obj func = func_st.find_var(funcname);
+        if (func != null && func.params() != params) {
+            token = funcname;
+            error_at("this function takes %d arguments but %d argument was supplied", func.params(), params);
+        }
         Node node = Node.new_node(NodeKind.FuncCall, null, null);
-        node.set_funcname(tok.str());
+        node.set_funcname(funcname.str());
         node.set_args(head.next());
         node.set_type(Type.Literal);  // 関数の戻り値の型は分からない。リテラルとして解釈する
         return node;
