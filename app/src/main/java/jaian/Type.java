@@ -14,8 +14,8 @@ public enum Type {
         switch (this) {
             case Literal: return 8;
             case Int:     return 8;
+            case String:  return 8;
             case Char:    return 1;
-            case String:  return 1;
             case Bool:    return 1;
             default:
                 App.error("unreachable");

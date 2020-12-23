@@ -196,6 +196,12 @@ assert  1 'int main() { ({ 0; return 1; 2; }); return 3; }'
 assert  6 'int main() { return ({ 1; }) + ({ 2; }) + ({ 3; }); }'
 assert  3 'int main() { return ({ int x=3; x; }); }'
 
+assert 42 'int main() { do {} while(false); return 42; }'
+assert 42 'int main() { {{}} return 42; }'
+assert 42 'int main() { ({}); return 42; }'
+assert 42 'int main() { (({})); return 42; }'
+assert 42 'int main() { (({({{}});})); return 42; }'
+
 # Clean out
 rm -f tmp tmp.s func.o
 

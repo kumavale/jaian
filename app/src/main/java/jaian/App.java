@@ -323,7 +323,7 @@ public class App {
 
     // stmt = expr? ";"
     //      | declaration
-    //      | "{" expr+ "}"
+    //      | "{" stmt* "}"
     //      | "if" "(" expr ")" stmt ("else" stmt)?
     //      | "do" stmt "while" "(" expr ")"
     //      | "while" "(" expr ")" stmt
@@ -338,7 +338,7 @@ public class App {
             return node;
         }
 
-        // "{" expr+ "}"
+        // "{" stmt* "}"
         if (consume("{")) {
             return compound_stmt();
         }
@@ -437,12 +437,12 @@ public class App {
         }
 
         // expr ";"
-        Node node = expr(null);
+        Node node = Node.new_node(NodeKind.ExprStmt, expr(null), null);
         expect(";");
         return node;
     }
 
-    // "{" expr+ "}"
+    // "{" stmt* "}"
     private static Node compound_stmt() {
         current_func.st().scope_in();
         Node head = new Node();
@@ -508,7 +508,8 @@ public class App {
                     error_at("mismatched types");
                 }
             }
-            cur.set_next(Node.new_node(NodeKind.Assign, lhs, rhs));
+            Node node = Node.new_node(NodeKind.Assign, lhs, rhs);
+            cur.set_next(Node.new_node(NodeKind.ExprStmt, node, null));
             cur = cur.next();
         } while (consume(","));
         Node node = Node.new_node(NodeKind.Block, null, null);
@@ -621,7 +622,7 @@ public class App {
         return node;
     }
 
-    // primary = "(" "{" stmt+ "}" ")"
+    // primary = "(" "{" stmt* "}" ")"
     //         | "(" expr ")"
     //         | ident ("[" expr "]")?
     //         | ident func-args?
@@ -631,9 +632,9 @@ public class App {
     private static Node primary(Type ty) {
         if (consume("(")) {
             Node node;
-            // "(" "{" stmt+ "}" ")"
+            // "(" "{" stmt* "}" ")"
             if (consume("{")) {
-                node = Node.new_node(NodeKind.Block, null, null);
+                node = Node.new_node(NodeKind.BlockExpr, null, null);
                 node.set_body(compound_stmt().body());
                 node.set_type(ty);
             } else {
@@ -790,15 +791,12 @@ public class App {
 
         // 先頭の式から順にコード生成
         for (i = 0; i < func.size(); ++i) {
-            gen(func.get(i));
+            gen_stmt(func.get(i));
         }
-
-        // 式の評価結果としてスタックに一つの値が残っている
-        // はずなので、スタックが溢れないようにポップしておく
-        System.out.println("    pop rax");
 
         // エピローグ
         // 最後の式の結果がRAXに残っているのでそれが返り値になる
+        System.out.printf(".L.return.%s:\n", func.name());
         System.out.println("    mov rsp, rbp");
         System.out.println("    pop rbp");
         System.out.println("    ret");
@@ -815,13 +813,12 @@ public class App {
         } else {
             System.out.printf("    lea rax, %s[rip]\n", node.variable().name());
         }
-        System.out.printf("    push rax\n");
     }
 
     /** 式を左辺値として評価(配列) */
     private static void gen_array(Node node) {
-        gen(node.element());
-        System.out.printf("    pop rdx\n");
+        gen_expr(node.element());
+        System.out.printf("    mov rdx, rax\n");
         System.out.printf("    imul rdx, %d\n", node.type().size());
         if (node.variable().is_local()) {
             System.out.printf("    mov rax, rbp\n");
@@ -831,40 +828,35 @@ public class App {
             System.out.printf("    lea rax, %s[rip]\n", node.variable().name());
             System.out.printf("    add rax, rdx\n");
         }
-        System.out.printf("    push rax\n");
     }
 
     /** コード生成 */
-    private static void gen(Node node) {
+    private static void gen_expr(Node node) {
         switch (node.kind()) {
             case Num:
-                System.out.printf("    push %d\n", node.val());
+                System.out.printf("    mov rax, %d\n", node.val());
                 return;
             case True:
-                System.out.println("    push 1");
+                System.out.println("    mov rax, 1");
                 return;
             case False:
-                System.out.println("    push 0");
+                System.out.println("    mov rax, 0");
                 return;
             case Var:
                 gen_val(node);
-                System.out.println("    pop rax");
                 if (node.type().size() == 1) {
                     System.out.println("    movsx rax, BYTE PTR [rax]");
                 } else {
                     System.out.println("    mov rax, [rax]");
                 }
-                System.out.println("    push rax");
                 return;
             case Array:
                 gen_array(node);
-                System.out.println("    pop rax");
                 if (node.type().size() == 1) {
                     System.out.println("    movsx rax, BYTE PTR [rax]");
                 } else {
                     System.out.println("    mov rax, [rax]");
                 }
-                System.out.println("    push rax");
                 return;
             case Addr:
                 gen_array(node);
@@ -876,33 +868,26 @@ public class App {
                     case Array: gen_array(node.lhs()); break;
                     default: error("invalid assign");
                 }
-                gen(node.rhs());
-                System.out.println("    pop rdi");  // rhsの結果
-                System.out.println("    pop rax");  // lhsのアドレス
+                System.out.println("    push rax");
+                gen_expr(node.rhs());
+                System.out.println("    pop rdi");  // lhsの結果
                 if (node.lhs().type().size() == 1) {
-                    System.out.println("    mov [rax], dil");
+                    System.out.println("    mov [rdi], al");
                 } else {
-                    System.out.println("    mov [rax], rdi");
+                    System.out.println("    mov [rdi], rax");
                 }
-                System.out.println("    push rdi");
                 return;
-            case Block:
+            case BlockExpr:
                 for (Node stmt = node.body(); stmt != null; stmt = stmt.next()) {
-                    gen(stmt);
+                    gen_stmt(stmt);
                 }
-                return;
-            case Return:
-                gen(node.lhs());
-                System.out.println("    pop rax");
-                System.out.println("    mov rsp, rbp");
-                System.out.println("    pop rbp");
-                System.out.println("    ret");
                 return;
             case FuncCall:
                 int nargs = 0;
                 for (Node arg = node.args(); arg != null; arg = arg.next()) {
                     // 実引数の計算結果(rax)をスタックにpushしている
-                    gen(arg);
+                    gen_expr(arg);
+                    System.out.println("    push rax");
                     ++nargs;
                 }
                 // 6つより多い引数はとりあえず実装しない
@@ -916,33 +901,76 @@ public class App {
                 }
                 System.out.printf("    mov al, 0\n");
                 System.out.printf("    call %s\n", node.funcname());
-                System.out.printf("    push rax\n");
                 return;
+        }
+
+        gen_expr(node.rhs());
+        System.out.println("    push rax");
+        gen_expr(node.lhs());
+        System.out.println("    pop rdi");
+
+        switch (node.kind()) {
+            case Add:
+                System.out.println("    add rax, rdi");
+                return;
+            case Sub:
+                System.out.println("    sub rax, rdi");
+                return;
+            case Mul:
+                System.out.println("    imul rax, rdi");
+                return;
+            case Div:
+                System.out.println("    cqo");
+                System.out.println("    idiv rdi");
+                return;
+            case Eq:
+                System.out.println("    cmp rax, rdi");
+                System.out.println("    sete al");
+                System.out.println("    movzb rax, al");
+                return;
+            case Ne:
+                System.out.println("    cmp rax, rdi");
+                System.out.println("    setne al");
+                System.out.println("    movzb rax, al");
+                return;
+            case Lt:
+                System.out.println("    cmp rax, rdi");
+                System.out.println("    setl al");
+                System.out.println("    movzb rax, al");
+                return;
+            case Le:
+                System.out.println("    cmp rax, rdi");
+                System.out.println("    setle al");
+                System.out.println("    movzb rax, al");
+                return;
+        }
+
+        // ここへはたどり着かないべき。
+        // 入力されたソースではなく、こちらのプログラムの問題
+        error("invalid statement: %s", node.kind().toString());
+    }
+
+    private static void gen_stmt(Node node) {
+        switch (node.kind()) {
             case If: {
                 int count = sequence();
-                gen(node.cond());
-                System.out.println("    pop rax");
+                gen_expr(node.cond());
                 System.out.println("    cmp rax, 0");
+                System.out.printf("    je .L.else.%d\n", count);
+                gen_stmt(node.then());
+                System.out.printf("    jmp .L.end.%d\n", count);
+                System.out.printf(".L.else.%d:\n", count);
                 if (node.els() != null) {
-                    System.out.printf("    je .L.else.%d\n", count);
-                    gen(node.then());
-                    System.out.printf("    jmp .L.end.%d\n", count);
-                    System.out.printf(".L.else.%d:\n", count);
-                    gen(node.els());
-                    System.out.printf(".L.end.%d:\n", count);
-                } else {
-                    System.out.printf("    je .L.end.%d\n", count);
-                    gen(node.then());
-                    System.out.printf(".L.end.%d:\n", count);
+                    gen_stmt(node.els());
                 }
+                System.out.printf(".L.end.%d:\n", count);
                 return;
             }
             case Do: {
                 int count = sequence();
                 System.out.printf(".L.begin.%d:\n", count);
-                gen(node.then());
-                gen(node.cond());
-                System.out.println("    pop rax");
+                gen_stmt(node.then());
+                gen_expr(node.cond());
                 System.out.println("    cmp rax, 0");
                 System.out.printf("    jne .L.begin.%d\n", count);
                 return;
@@ -950,11 +978,10 @@ public class App {
             case While: {
                 int count = sequence();
                 System.out.printf(".L.begin.%d:\n", count);
-                gen(node.cond());
-                System.out.println("    pop rax");
+                gen_expr(node.cond());
                 System.out.println("    cmp rax, 0");
                 System.out.printf("    je .L.end.%d\n", count);
-                gen(node.then());
+                gen_stmt(node.then());
                 System.out.printf("    jmp .L.begin.%d\n", count);
                 System.out.printf(".L.end.%d:\n", count);
                 return;
@@ -962,68 +989,39 @@ public class App {
             case For: {
                 int count = sequence();
                 if (node.init() != null) {
-                    gen(node.init());
+                    gen_stmt(node.init());
                 }
                 System.out.printf(".L.begin.%d:\n", count);
                 if (node.cond() != null) {
-                    gen(node.cond());
-                    System.out.println("    pop rax");
+                    gen_expr(node.cond());
                     System.out.println("    cmp rax, 0");
                     System.out.printf("    je .L.end.%d\n", count);
                 }
-                gen(node.then());
+                gen_stmt(node.then());
                 if (node.inc() != null) {
-                    gen(node.inc());
+                    gen_expr(node.inc());
                 }
                 System.out.printf("    jmp .L.begin.%d\n", count);
                 System.out.printf(".L.end.%d:\n", count);
                 return;
             }
+            case Block:
+                for (Node stmt = node.body(); stmt != null; stmt = stmt.next()) {
+                    gen_stmt(stmt);
+                }
+                return;
+            case Return:
+                gen_expr(node.lhs());
+                System.out.printf("    jmp .L.return.%s\n", current_func.name());
+                return;
+            case ExprStmt:
+                gen_expr(node.lhs());
+                return;
         }
 
-        gen(node.lhs());
-        gen(node.rhs());
-
-        System.out.println("    pop rdi");
-        System.out.println("    pop rax");
-
-        switch (node.kind()) {
-            case Add:
-                System.out.println("    add rax, rdi");
-                break;
-            case Sub:
-                System.out.println("    sub rax, rdi");
-                break;
-            case Mul:
-                System.out.println("    imul rax, rdi");
-                break;
-            case Div:
-                System.out.println("    cqo");
-                System.out.println("    idiv rdi");
-                break;
-            case Eq:
-                System.out.println("    cmp rax, rdi");
-                System.out.println("    sete al");
-                System.out.println("    movzb rax, al");
-                break;
-            case Ne:
-                System.out.println("    cmp rax, rdi");
-                System.out.println("    setne al");
-                System.out.println("    movzb rax, al");
-                break;
-            case Lt:
-                System.out.println("    cmp rax, rdi");
-                System.out.println("    setl al");
-                System.out.println("    movzb rax, al");
-                break;
-            case Le:
-                System.out.println("    cmp rax, rdi");
-                System.out.println("    setle al");
-                System.out.println("    movzb rax, al");
-                break;
-        }
-
-        System.out.println("    push rax");
+        // ここへはたどり着かないべき。
+        // 入力されたソースではなく、こちらのプログラムの問題
+        error("invalid statement: %s", node.kind().toString());
     }
 }
 
