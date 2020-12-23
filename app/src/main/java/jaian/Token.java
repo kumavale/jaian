@@ -97,19 +97,19 @@ public class Token {
                 }
                 switch (src.substring(begin, idx + 1)) {
                     // Types
-                    case "int":     cur = new_token(TokenKind.Int,     cur, begin, idx - begin + 1); break;
-                    case "char":    cur = new_token(TokenKind.Char,    cur, begin, idx - begin + 1); break;
-                    case "boolean": cur = new_token(TokenKind.Boolean, cur, begin, idx - begin + 1); break;
+                    case "int":    cur = new_token(TokenKind.Int,    cur, begin, idx - begin + 1); break;
+                    case "char":   cur = new_token(TokenKind.Char,   cur, begin, idx - begin + 1); break;
+                    case "bool":   cur = new_token(TokenKind.Bool,   cur, begin, idx - begin + 1); break;
                     // Keywords
-                    case "if":      cur = new_token(TokenKind.If,      cur, begin, idx - begin + 1); break;
-                    case "else":    cur = new_token(TokenKind.Else,    cur, begin, idx - begin + 1); break;
-                    case "do":      cur = new_token(TokenKind.Do,      cur, begin, idx - begin + 1); break;
-                    case "while":   cur = new_token(TokenKind.While,   cur, begin, idx - begin + 1); break;
-                    case "for":     cur = new_token(TokenKind.For,     cur, begin, idx - begin + 1); break;
-                    case "return":  cur = new_token(TokenKind.Return,  cur, begin, idx - begin + 1); break;
-                    case "true":    cur = new_token(TokenKind.True,    cur, begin, idx - begin + 1); break;
-                    case "false":   cur = new_token(TokenKind.False,   cur, begin, idx - begin + 1); break;
-                    default:        cur = new_token(TokenKind.Ident,   cur, begin, idx - begin + 1);
+                    case "if":     cur = new_token(TokenKind.If,     cur, begin, idx - begin + 1); break;
+                    case "else":   cur = new_token(TokenKind.Else,   cur, begin, idx - begin + 1); break;
+                    case "do":     cur = new_token(TokenKind.Do,     cur, begin, idx - begin + 1); break;
+                    case "while":  cur = new_token(TokenKind.While,  cur, begin, idx - begin + 1); break;
+                    case "for":    cur = new_token(TokenKind.For,    cur, begin, idx - begin + 1); break;
+                    case "return": cur = new_token(TokenKind.Return, cur, begin, idx - begin + 1); break;
+                    case "true":   cur = new_token(TokenKind.True,   cur, begin, idx - begin + 1); break;
+                    case "false":  cur = new_token(TokenKind.False,  cur, begin, idx - begin + 1); break;
+                    default:       cur = new_token(TokenKind.Ident,  cur, begin, idx - begin + 1);
                 }
                 continue;
             }
@@ -178,7 +178,7 @@ public class Token {
         switch (this.kind) {
             case Int:
             case Char:
-            case Boolean: return true;
+            case Bool: return true;
         }
         return false;
     }

@@ -137,9 +137,9 @@ public class App {
      */
     private static Type consume_type() {
         switch (token.kind()) {
-            case Int:     consume(); return Type.Int;
-            case Char:    consume(); return Type.Char;
-            case Boolean: consume(); return Type.Boolean;
+            case Int:  consume(); return Type.Int;
+            case Char: consume(); return Type.Char;
+            case Bool: consume(); return Type.Bool;
             default:                 return null;
         }
     }
@@ -198,15 +198,15 @@ public class App {
      */
     private static Type expect_type() {
         switch (token.kind()) {
-            case Int:     consume(); return Type.Int;
-            case Char:    consume(); return Type.Char;
-            case Boolean: consume(); return Type.Boolean;
+            case Int:  consume(); return Type.Int;
+            case Char: consume(); return Type.Char;
+            case Bool: consume(); return Type.Bool;
             default: error_at("Not a type: \"%s\"", token.str());
         }
         return null;  // unreachable
     }
 
-    /** 指定のノードがbooleanとして解釈されない場合、エラーを報告して終了。 */
+    /** 指定のノードがboolとして解釈されない場合、エラーを報告して終了。 */
     private static void expect_boolean(Node node) {
         switch (node.kind()) {
             case Eq:
@@ -216,8 +216,8 @@ public class App {
             case True:
             case False: break;
             default:
-                if (node.type() != Type.Boolean) {
-                    error_at("incompatible types: expected \"boolean\"");
+                if (node.type() != Type.Bool) {
+                    error_at("incompatible types: expected \"bool\"");
                 }
         }
     }
@@ -266,7 +266,7 @@ public class App {
 
     // function = type ident "(" (param ("," param)*)? ")" "{" stmt* "}"
     // param = type ident
-    // type = "int" | "char" | "boolean"
+    // type = "int" | "char" | "bool"
     private static Function function() {
         Function func = new Function();
         current_func = func;
@@ -528,7 +528,7 @@ public class App {
             } else {
                 return node;
             }
-            node.set_type(Type.Boolean);
+            node.set_type(Type.Bool);
         }
     }
 
@@ -548,7 +548,7 @@ public class App {
             } else {
                 return node;
             }
-            node.set_type(Type.Boolean);
+            node.set_type(Type.Bool);
         }
     }
 
@@ -627,7 +627,7 @@ public class App {
     //         | ident func-args?
     //         | str
     //         | num
-    //         | boolean
+    //         | bool
     private static Node primary(Type ty) {
         if (consume("(")) {
             Node node;
@@ -724,14 +724,14 @@ public class App {
             return node;
         }
 
-        // boolean型
+        // bool型
         if (consume(TokenKind.True)) {
             Node node = Node.new_node(NodeKind.True, null, null);
-            node.set_type(Type.Boolean);
+            node.set_type(Type.Bool);
             return node;
         } else if (consume(TokenKind.False)) {
             Node node = Node.new_node(NodeKind.False, null, null);
-            node.set_type(Type.Boolean);
+            node.set_type(Type.Bool);
             return node;
         }
 

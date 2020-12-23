@@ -9,9 +9,9 @@ public enum TokenKind {
     EOF,     /** 入力の終わり */
 
     // Types
-    Int,      /** "int" */
-    Char,     /** "char" */
-    Boolean,  /** "boolean" */
+    Int,   /** "int" */
+    Char,  /** "char" */
+    Bool,  /** "bool" */
 
     // Keywords
     If,      /** "if" */

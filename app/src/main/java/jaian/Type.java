@@ -6,7 +6,7 @@ public enum Type {
     String,   /** 文字列リテラル */
     Int,      /** "int" */
     Char,     /** "char" */
-    Boolean,  /** "boolean" */
+    Bool,     /** "bool" */
     ;
 
     /** 型のサイズ(byte)を返す。 */
@@ -16,7 +16,7 @@ public enum Type {
             case Int:     return 8;
             case Char:    return 1;
             case String:  return 1;
-            case Boolean: return 1;
+            case Bool:    return 1;
             default:
                 App.error("unreachable");
                 return 0;
