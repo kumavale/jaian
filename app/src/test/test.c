@@ -100,6 +100,10 @@ int main() {
     assert_eq(42, { int i; do { i=42; } while(false); i; });
     assert_eq(10, { int j=0; for(int i=0; i<5; i=i+1) j=j+i; j; });
     assert_eq(42, { int i=42; for(int i=0; i<5; i=i+1); i; });
+    assert_eq(42, { do {} while(false); 42; });
+    assert_eq(42, { do ; while(false); 42; });
+    assert_eq(42, { do 1; while(false); 42; });
+    assert_eq(42, { do while(false); while(false); 42; });
 
     // function
     assert_eq(  3, ret3());
@@ -116,7 +120,6 @@ int main() {
     // block
     assert_eq( 3, { 1; {2;} 3; });
     assert_eq( 5, { ;;; 5; });
-    assert_eq(42, { do {} while(false); 42; });
     assert_eq(42, { {{}} 42; });
     assert_eq(42, { ({}); 42; });
     assert_eq(42, { (({})); 42; });
@@ -178,8 +181,8 @@ int main() {
     assert_eq(104, "\1500"[0]);
     assert_eq(  0, "\x00"[0]);
     assert_eq(119, "\x77"[0]);
-    assert_eq(  5, { printf("[abc]"); });                 // 出力される文字列も要確認
-    assert_eq(  7, { printf("[2+3=%d]", 2+3); });         // 出力される文字列も要確認
+    assert_eq(  5, { printf("[abc]"); });                  // 出力される文字列も要確認
+    assert_eq(  7, { printf("[2+3=%d]", 2+3); });          // 出力される文字列も要確認
     assert_eq( 15, { printf("[\x1b[34mBLUE\x1b[0m]"); });  // 出力される文字列も要確認
     assert_eq(  0, { if ("abc" == "abc") 0; else 1; });  // アドレスの比較
     assert_eq(  1, { if ("abc" == "xyz") 0; else 1; });  // アドレスの比較

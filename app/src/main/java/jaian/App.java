@@ -597,10 +597,7 @@ public class App {
             return unary(ty);
         }
         if (consume("-")) {
-            Node unary = unary(ty);
-            Node node = Node.new_node(NodeKind.Sub, Node.new_node_num(0), unary);
-            node.set_type(unary.type());
-            return node;
+            return Node.new_node(NodeKind.Neg, unary(ty), null);
         }
         return primary(ty);
     }
@@ -835,6 +832,10 @@ public class App {
         switch (node.kind()) {
             case Num:
                 System.out.printf("    mov rax, %d\n", node.val());
+                return;
+            case Neg:
+                gen_expr(node.lhs());
+                System.out.println("    neg rax");
                 return;
             case True:
                 System.out.println("    mov rax, 1");

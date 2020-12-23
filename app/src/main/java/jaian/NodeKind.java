@@ -6,6 +6,7 @@ public enum NodeKind {
     Sub,        /** - */
     Mul,        /** * */
     Div,        /** / */
+    Neg,        /** unary - */
     Eq,         /** == */
     Ne,         /** != */
     Lt,         /** < */
