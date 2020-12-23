@@ -215,7 +215,10 @@ public class App {
             case Le:
             case True:
             case False: break;
-            default: error_at("incompatible types: expected \"boolean\"");
+            default:
+                if (node.type() != Type.Boolean) {
+                    error_at("incompatible types: expected \"boolean\"");
+                }
         }
     }
 
@@ -320,7 +323,7 @@ public class App {
 
     // stmt = expr? ";"
     //      | declaration
-    //      | "{" expr* "}"
+    //      | "{" expr+ "}"
     //      | "if" "(" expr ")" stmt ("else" stmt)?
     //      | "do" stmt "while" "(" expr ")"
     //      | "while" "(" expr ")" stmt
@@ -335,19 +338,9 @@ public class App {
             return node;
         }
 
-        // "{" expr* "}"
+        // "{" expr+ "}"
         if (consume("{")) {
-            current_func.st().scope_in();
-            Node head = new Node();
-            Node cur = head;
-            while (!consume("}")) {
-                cur.set_next(stmt());
-                cur = cur.next();
-            }
-            Node node = Node.new_node(NodeKind.Block, null, null);
-            node.set_body(head.next());
-            current_func.st().scope_out();
-            return node;
+            return compound_stmt();
         }
 
         // "if" "(" expr ")" stmt ("else" stmt)?
@@ -446,6 +439,21 @@ public class App {
         // expr ";"
         Node node = expr(null);
         expect(";");
+        return node;
+    }
+
+    // "{" expr+ "}"
+    private static Node compound_stmt() {
+        current_func.st().scope_in();
+        Node head = new Node();
+        Node cur = head;
+        while (!consume("}")) {
+            cur.set_next(stmt());
+            cur = cur.next();
+        }
+        Node node = Node.new_node(NodeKind.Block, null, null);
+        node.set_body(head.next());
+        current_func.st().scope_out();
         return node;
     }
 
@@ -613,11 +621,25 @@ public class App {
         return node;
     }
 
-    // primary = "(" expr ")" | ident ("[" expr "]")? | ident func-args? | str | num | boolean
+    // primary = "(" "{" stmt+ "}" ")"
+    //         | "(" expr ")"
+    //         | ident ("[" expr "]")?
+    //         | ident func-args?
+    //         | str
+    //         | num
+    //         | boolean
     private static Node primary(Type ty) {
-        // 次のトークンが "(" なら、 "(" expr ")" のはず
         if (consume("(")) {
-            Node node = expr(ty);
+            Node node;
+            // "(" "{" stmt+ "}" ")"
+            if (consume("{")) {
+                node = Node.new_node(NodeKind.Block, null, null);
+                node.set_body(compound_stmt().body());
+                node.set_type(ty);
+            } else {
+                // "(" expe ")"
+                node = expr(ty);
+            }
             expect(")");
             return node;
         }

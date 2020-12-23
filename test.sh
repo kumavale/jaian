@@ -25,7 +25,8 @@ function assert() {
 
     gradle run --quiet --no-rebuild --args="'$input'" > tmp.s
     if [ "$?" -ne "0" ]; then
-        echo -e "'$input' ... \033[31mFAILED\033[0m"
+        echo -n "'$input'"
+        echo -e " ... \033[31mFAILED\033[0m"
         NGCNT=$((NGCNT+1))
         return 1;
     fi
@@ -33,10 +34,12 @@ function assert() {
     actual="$?"
 
     if [ "$expected" = "$actual" ]; then
-        echo -e "'$input' => $actual ... \033[32mok\033[0m"
+        echo -n "'$input'"
+        echo -e " => $actual ... \033[32mok\033[0m"
         OKCNT=$((OKCNT+1))
     else
-        echo -e "'$input' => $actual ... \033[31mFAILED\033[0m: expected $expected, but got $actual"
+        echo -n "'$input'"
+        echo -e " => $actual ... \033[31mFAILED\033[0m: expected $expected, but got $actual"
         NGCNT=$((NGCNT+1))
     fi
 }
@@ -103,6 +106,8 @@ assert  2 'int main() { if(true) return 2; else return 3; }'
 assert  3 'int main() { if(false) return 2; else if(true) return 3; }'
 assert  4 'int main() { if(false) return 2; else if(false) return 3; else return 4; }'
 assert  2 'int main() { if(true) { return 2; } else { return 3; } }'
+assert  2 'int main() { boolean t=true; if(t) { return 2; } else { return 3; } }'
+assert  3 'int main() { boolean f=false; if(f) { return 2; } else { return 3; } }'
 
 assert  4 'int main() { int i=5; int j=0; while(0<(i=i-1)) j=j+1; return j; }'
 assert  1 'int main() { while(false) return 0; return 1; }'
@@ -182,6 +187,14 @@ assert  0 'int main() { printf("[abc]"); return 0; }'
 assert  5 'int main() { printf("[2+3=%d]", 2+3); return 5; }'
 assert  0 'int main() { if ("abc" == "abc") return 0; return 1; }'  # アドレスの比較
 assert  1 'int main() { if ("abc" == "xyz") return 0; return 1; }'  # アドレスの比較
+
+assert 42 'int main() { return ({ 42; }); }'
+assert  3 'int main() { int i=({ 1+2; }); return i; }'
+assert  4 'int main() { boolean i=({ 1==1; }); if(i) return 4; return 5; }'
+assert  2 'int main() { return ({ 0; 1; 2; }); }'
+assert  1 'int main() { ({ 0; return 1; 2; }); return 3; }'
+assert  6 'int main() { return ({ 1; }) + ({ 2; }) + ({ 3; }); }'
+assert  3 'int main() { return ({ int x=3; x; }); }'
 
 # Clean out
 rm -f tmp tmp.s func.o
