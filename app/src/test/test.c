@@ -88,8 +88,8 @@ int main() {
     assert_eq( 3, { int x; if (1-1==1) x=2; else x=3; x; });
     assert_eq( 2, { int x; if (true) x=2; else x=3; x; });
     assert_eq( 2, { int x; if (2-1==1) x=2; else x=3; x; });
-    assert_eq( 2, { bool t=true; if(t) { 2; } else { 3; } });
-    assert_eq( 3, { bool f=false; if(f) { 2; } else { 3; } });
+    assert_eq( 2, { int x; bool t=true; if(t) { x=2; } else { x=3; } x; });
+    assert_eq( 3, { int x; bool f=false; if(f) { x=2; } else { x=3; } x; });
     assert_eq(55, { int j=0; for (int i=0; i<=10; i=i+1) j=i+j; j; });
     assert_eq(10, { int i=0; while(i<10) i=i+1; i; });
     assert_eq( 3, { 1; {2;} 3; });
@@ -121,9 +121,9 @@ int main() {
     assert_eq( 3, { 1; {2;} 3; });
     assert_eq( 5, { ;;; 5; });
     assert_eq(42, { {{}} 42; });
-    assert_eq(42, { ({}); 42; });
-    assert_eq(42, { (({})); 42; });
-    assert_eq(42, { (({({{}});})); 42; });
+    assert_eq(42, { ({ 42; }); });
+    assert_eq(42, { (({ 42; })); });
+    assert_eq(42, { (({({ 42; });})); });
 
     // array
     assert_eq( 6, ({ int a[3]; a[0]=1; a[1]=2; a[2]=3; a[0]+a[1]+a[2]; }));
@@ -184,13 +184,13 @@ int main() {
     assert_eq(  5, { printf("[abc]"); });                  // 出力される文字列も要確認
     assert_eq(  7, { printf("[2+3=%d]", 2+3); });          // 出力される文字列も要確認
     assert_eq( 15, { printf("[\x1b[34mBLUE\x1b[0m]"); });  // 出力される文字列も要確認
-    assert_eq(  0, { if ("abc" == "abc") 0; else 1; });  // アドレスの比較
-    assert_eq(  1, { if ("abc" == "xyz") 0; else 1; });  // アドレスの比較
+    assert_eq(  0, { int x; if ("abc" == "abc") x=0; else x=1; x; });  // アドレスの比較
+    assert_eq(  1, { int x; if ("abc" == "xyz") x=0; else x=1; x; });  // アドレスの比較
 
     // statement expression
     assert_eq(42, { ({ 42; }); });
     assert_eq( 3, { int i=({ 1+2; }); i; });
-    assert_eq( 4, { bool i=({ 1==1; }); if(i) 4; else 5; });
+    assert_eq( 4, { int x; bool i=({ 1==1; }); if(i) x=4; else x=5; x; });
     assert_eq( 2, { ({ 0; 1; 2; }); });
     assert_eq( 3, { ({ 0; 1; 2; }); 3; });
     assert_eq( 6, { ({ 1; }) + ({ 2; }) + ({ 3; }); });

@@ -42,6 +42,15 @@ public class Node {
         return node;
     }
 
+    /** bodyフィールドの最後のNodeを返す。 */
+    public Node last() {
+        Node last = null;
+        for (Node stmt = this.body; stmt != null; stmt = stmt.next) {
+            last = stmt;
+        }
+        return last;
+    }
+
     // Getters
     public NodeKind kind()   { return this.kind; }
     public Node lhs()        { return this.lhs; }

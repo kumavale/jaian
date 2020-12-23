@@ -222,6 +222,45 @@ public class App {
         }
     }
 
+    /**
+     * 左辺と右辺の型が一致しているか確認する。
+     * どちらかが数値リテラルである場合、もう一方の型をセットする。
+     * 一致していない場合、エラーを出力して終了する。
+     */
+    private static void verify_type(Node left, Node right) {
+        if (left.type() != right.type()) {
+            if (left.type() == null) {
+                back();
+                error_at("invalid type: expect `%s`, found `%s`",
+                        right.type().toString().toLowerCase(), left.kind().toString().toLowerCase());
+            }
+            if (right.type() == null) {
+                back();
+                error_at("invalid type: expect `%s`, found `%s`",
+                        left.type().toString().toLowerCase(), right.kind().toString().toLowerCase());
+            }
+            if (left.type() == Type.Literal) {
+                switch (right.type()) {
+                    case Int:
+                    case Char:
+                        left.set_type(right.type());
+                        return;
+                }
+            }
+            if (right.type() == Type.Literal) {
+                switch (left.type()) {
+                    case Int:
+                    case Char:
+                        right.set_type(left.type());
+                        return;
+                }
+            }
+            back();
+            error_at("mismatched types: expect `%s`, found `%s`",
+                    left.type().toString().toLowerCase(), right.type().toString().toLowerCase());
+        }
+    }
+
     // program = function*
     private static void program() {
         while (!token.at_eof()) {
@@ -437,7 +476,9 @@ public class App {
         }
 
         // expr ";"
-        Node node = Node.new_node(NodeKind.ExprStmt, expr(null), null);
+        Node expr = expr(null);
+        Node node = Node.new_node(NodeKind.ExprStmt, expr, null);
+        node.set_type(expr.type());
         expect(";");
         return node;
     }
@@ -477,7 +518,8 @@ public class App {
                     rhs.set_type(lhs.type());
                 } else {
                     back();
-                    error_at("mismatched types");
+                    error_at("mismatched types: expect `%s`, found `%s`",
+                            lhs.type().toString().toLowerCase(), rhs.type().toString().toLowerCase());
                 }
             }
             lhs = Node.new_node(NodeKind.Assign, lhs, rhs);
@@ -505,7 +547,8 @@ public class App {
                     rhs.set_type(lhs.type());
                 } else {
                     back();
-                    error_at("mismatched types");
+                    error_at("mismatched types: expect `%s`, found `%s`",
+                            lhs.type().toString().toLowerCase(), rhs.type().toString().toLowerCase());
                 }
             }
             Node node = Node.new_node(NodeKind.Assign, lhs, rhs);
@@ -523,9 +566,13 @@ public class App {
 
         while (true) {
             if (consume("==")) {
-                node = Node.new_node(NodeKind.Eq, node, relational(ty));
+                Node rhs = relational(ty);
+                verify_type(node, rhs);
+                node = Node.new_node(NodeKind.Eq, node, rhs);
             } else if (consume("!=")) {
-                node = Node.new_node(NodeKind.Ne, node, relational(ty));
+                Node rhs = relational(ty);
+                verify_type(node, rhs);
+                node = Node.new_node(NodeKind.Ne, node, rhs);
             } else {
                 return node;
             }
@@ -539,13 +586,21 @@ public class App {
 
         while (true) {
             if (consume("<")) {
-                node = Node.new_node(NodeKind.Lt, node, add(ty));
+                Node rhs = add(ty);
+                verify_type(node, rhs);
+                node = Node.new_node(NodeKind.Lt, node, rhs);
             } else if (consume("<=")) {
-                node = Node.new_node(NodeKind.Le, node, add(ty));
+                Node rhs = add(ty);
+                verify_type(node, rhs);
+                node = Node.new_node(NodeKind.Le, node, rhs);
             } else if (consume(">")) {
-                node = Node.new_node(NodeKind.Lt, add(ty), node);
+                Node lhs = add(ty);
+                verify_type(node, lhs);
+                node = Node.new_node(NodeKind.Lt, lhs, node);
             } else if (consume(">=")) {
-                node = Node.new_node(NodeKind.Le, add(ty), node);
+                Node lhs = add(ty);
+                verify_type(node, lhs);
+                node = Node.new_node(NodeKind.Le, lhs, node);
             } else {
                 return node;
             }
@@ -559,12 +614,16 @@ public class App {
 
         while (true) {
             if (consume("+")) {
+                Node rhs = mul(ty);
+                verify_type(node, rhs);
                 Type type = node.type();
-                node = Node.new_node(NodeKind.Add, node, mul(ty));
+                node = Node.new_node(NodeKind.Add, node, rhs);
                 node.set_type(type);
             } else if (consume("-")) {
+                Node rhs = mul(ty);
+                verify_type(node, rhs);
                 Type type = node.type();
-                node = Node.new_node(NodeKind.Sub, node, mul(ty));
+                node = Node.new_node(NodeKind.Sub, node, rhs);
                 node.set_type(type);
             } else {
                 return node;
@@ -578,12 +637,16 @@ public class App {
 
         while (true) {
             if (consume("*")) {
+                Node rhs = cast(ty);
+                verify_type(node, rhs);
                 Type type = node.type();
-                node = Node.new_node(NodeKind.Mul, node, cast(ty));
+                node = Node.new_node(NodeKind.Mul, node, rhs);
                 node.set_type(type);
             } else if (consume("/")) {
+                Node rhs = cast(ty);
+                verify_type(node, rhs);
                 Type type = node.type();
-                node = Node.new_node(NodeKind.Div, node, cast(ty));
+                node = Node.new_node(NodeKind.Div, node, rhs);
                 node.set_type(type);
             } else {
                 return node;
@@ -614,7 +677,10 @@ public class App {
             return unary(ty);
         }
         if (consume("-")) {
-            return Node.new_node(NodeKind.Neg, unary(ty), null);
+            Node unary = unary(ty);
+            Node node = Node.new_node(NodeKind.Neg, unary, null);
+            node.set_type(unary.type());
+            return node;
         }
         return primary(ty);
     }
@@ -633,10 +699,11 @@ public class App {
         Node node = Node.new_node(NodeKind.FuncCall, null, null);
         node.set_funcname(tok.str());
         node.set_args(head.next());
+        node.set_type(Type.Literal);  // 関数の戻り値の型は分からない。リテラルとして解釈する
         return node;
     }
 
-    // primary = "(" "{" stmt* "}" ")"
+    // primary = "(" "{" stmt+ "}" ")"
     //         | "(" expr ")"
     //         | ident ("[" expr "]")?
     //         | ident func-args?
@@ -646,11 +713,15 @@ public class App {
     private static Node primary(Type ty) {
         if (consume("(")) {
             Node node;
-            // "(" "{" stmt* "}" ")"
+            // "(" "{" stmt+ "}" ")"
             if (consume("{")) {
                 node = Node.new_node(NodeKind.BlockExpr, null, null);
                 node.set_body(compound_stmt().body());
-                node.set_type(ty);
+                if (node.body() == null) {
+                    back();
+                    error_at("void value not ignored as it ought to be");
+                }
+                node.set_type(node.last().type());
             } else {
                 // "(" expe ")"
                 node = expr(ty);
