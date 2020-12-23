@@ -178,15 +178,16 @@ assert  3 'int x[4]; int main() { x[0]=0; x[1]=1; x[2]=2; x[3]=3; return x[3]; }
 assert 16 'int x[4]; int main() { int y[4]; x[1]=9; y[1]=7; return x[1]+y[1]; }'
 assert  8 'int x; int main() { int y=8; return x+y; }'
 
-assert  0 'int main() { return ""[0]; }'
-assert 97 'int main() { return "abc"[0]; }'
-assert 98 'int main() { return "abc"[1]; }'
-assert 99 'int main() { return "abc"[2]; }'
-assert  0 'int main() { return "abc"[3]; }'
-assert  0 'int main() { printf("[abc]"); return 0; }'
-assert  5 'int main() { printf("[2+3=%d]", 2+3); return 5; }'
-assert  0 'int main() { if ("abc" == "abc") return 0; return 1; }'  # アドレスの比較
-assert  1 'int main() { if ("abc" == "xyz") return 0; return 1; }'  # アドレスの比較
+assert   0 'int main() { return ""[0]; }'
+assert  97 'int main() { return "abc"[0]; }'
+assert  98 'int main() { return "abc"[1]; }'
+assert  99 'int main() { return "abc"[2]; }'
+assert   0 'int main() { return "abc"[3]; }'
+assert 116 'int main() { return "\"quote\""[4]; }'
+assert   0 'int main() { printf("[abc]"); return 0; }'
+assert   5 'int main() { printf("[2+3=%d]", 2+3); return 5; }'
+assert   0 'int main() { if ("abc" == "abc") return 0; return 1; }'  # アドレスの比較
+assert   1 'int main() { if ("abc" == "xyz") return 0; return 1; }'  # アドレスの比較
 
 assert 42 'int main() { return ({ 42; }); }'
 assert  3 'int main() { int i=({ 1+2; }); return i; }'

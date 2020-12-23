@@ -38,6 +38,7 @@ public class Token {
                 ++idx;
                 while (idx+1 < src.length()) {
                     if (src.charAt(++idx) == '\n') {
+                        ++__LINE__;
                         break;
                     }
                 }
@@ -59,6 +60,9 @@ public class Token {
                         ++scope;
                         ++idx;
                     }
+                    if (src.charAt(idx) == '\n') {
+                        ++__LINE__;
+                    }
                     ++idx;
                 }
                 ++idx;
@@ -78,7 +82,7 @@ public class Token {
             // 文字列リテラル
             if (ch == '"') {
                 int begin = idx + 1;
-                while (src.charAt(++idx) != '"');
+                while (src.charAt(++idx) != '"' || src.charAt(idx-1) == '\\');
                 cur = new_token(TokenKind.String, cur, begin, idx - begin);
                 continue;
             }
@@ -126,7 +130,8 @@ public class Token {
                 continue;
             }
 
-            App.error_at("invalid token");
+            Token current_line = new_token(TokenKind.EOF, cur, idx, 1).current_line();
+            App.error("%d:%d: invalid character: \"%s\"", __LINE__, idx - current_line.idx(), ch);
         }
 
         new_token(TokenKind.EOF, cur, idx, 0);
