@@ -34,7 +34,7 @@ int add6(int a, int b, int c, int d, int e, int f) {
 }
 
 int sub_char(char a, char b, char c) {
-    return a - b - c;
+    return (int)(a - b - c);
 }
 
 int fib(int x) {

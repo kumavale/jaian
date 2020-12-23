@@ -420,10 +420,10 @@ public class App {
             if (return_value.type() != current_func.type() && return_value.type() != null) {
                 if (return_value.type() == Type.Literal) {
                     return_value.set_type(current_func.type());
-                // TODO: キャスト
-                //} else {
-                //    back();
-                //    error_at("mismatched return type");
+                } else {
+                    back();
+                    error_at("mismatched return type: expect `%s`, found `%s`",
+                            current_func.type().toString().toLowerCase(), return_value.type().toString().toLowerCase());
                 }
             }
             Node node = Node.new_node(NodeKind.Return, return_value, null);
@@ -572,18 +572,18 @@ public class App {
         }
     }
 
-    // mul = unary ("*" unary | "/" unary)*
+    // mul = cast ("*" cast | "/" cast)*
     private static Node mul(Type ty) {
-        Node node = unary(ty);
+        Node node = cast(ty);
 
         while (true) {
             if (consume("*")) {
                 Type type = node.type();
-                node = Node.new_node(NodeKind.Mul, node, unary(ty));
+                node = Node.new_node(NodeKind.Mul, node, cast(ty));
                 node.set_type(type);
             } else if (consume("/")) {
                 Type type = node.type();
-                node = Node.new_node(NodeKind.Div, node, unary(ty));
+                node = Node.new_node(NodeKind.Div, node, cast(ty));
                 node.set_type(type);
             } else {
                 return node;
@@ -591,7 +591,24 @@ public class App {
         }
     }
 
-    // unary = ("+" | "-")? unary
+    // cast = "(" type ")" cast | unary
+    private static Node cast(Type ty) {
+        if (consume("(")) {
+            if (!token.is_type()) {
+                back();
+            } else {
+                Type type = consume_type();
+                expect(")");
+                Node node = cast(ty);
+                node.set_type(type);
+                return node;
+            }
+        }
+        return unary(ty);
+    }
+
+    // unary = ("+" | "-") cast
+    //       | primary
     private static Node unary(Type ty) {
         if (consume("+")) {
             return unary(ty);
@@ -682,7 +699,12 @@ public class App {
                     error_at("not a array");
                 }
                 Node node = Node.new_node(NodeKind.Array, null, null);
-                node.set_element(expr(ty));
+                Node element = expr(ty);
+                if (element.kind() == NodeKind.Num && val.elements() <= element.val()) {
+                    back();
+                    error_at("index out of bounds: the length is %d but the index is %d", val.elements(), element.val());
+                }
+                node.set_element(element);
                 node.set_type(val.type());
                 node.set_variable(val);
                 expect("]");
