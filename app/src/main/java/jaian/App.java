@@ -7,9 +7,12 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.io.IOException;
+import java.io.File;
+import java.io.FileWriter;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.LinkOption;
 import java.util.stream.Collectors;
 
 public class App {
@@ -18,34 +21,56 @@ public class App {
     private static SymbolTable func_st   = new SymbolTable();        // 関数名用のシンボルテーブル
     private static List<Function> code = new ArrayList<Function>();  // 関数毎のコード
     private static Function current_func;                            // 現在処理中のFunction
+    private static StringBuilder assembly = new StringBuilder();     // 出力用アセンブリコード
     private static int seq = 0;                                      // ラベル用シーケンスナンバー
     private static final String[] argregs8  = { "dil", "sil",  "dl",  "cl", "r8b", "r9b" };  // 引数用レジスタ( 8bit)
     private static final String[] argregs64 = { "rdi", "rsi", "rdx", "rcx",  "r8",  "r9" };  // 引数用レジスタ(64bit)
 
     public static void main(String[] args) {
-        if (args.length != 1) {
-            System.err.println("Invalid arguments.");
+        if (args.length == 0) {
+            System.err.println("\033[31merror:\033[0m no input files");
+            help();
             System.exit(1);
         }
 
-        // コマンドライン引数でファイル名を指定して、それを読み込む
-        // 1ファイルのみ
-        String src = read_file(args[0]);
+        // 各ファイル毎にコンパイル
+        for (String arg: args) {
+            try {
+                // コマンドライン引数でファイル名を指定して、それを読み込む
+                String src = read_file(arg);
 
-        // トークナイズしてパースする
-        // 結果はcodeに保存される
-        token = Token.tokenize(src);
-        program();
+                // 出力用ファイルのオープン
+                FileWriter fw = new FileWriter(change_extension(arg), false);
 
-        // アセンブリの前半部分を出力
-        System.out.println(".intel_syntax noprefix");
+                // コンパイルメッセージ
+                String path = Paths.get(arg).toRealPath(LinkOption.NOFOLLOW_LINKS).toString();
+                System.err.println();
+                System.err.printf("\033[32mCompiling\033[0m %s\n", path);
+                System.err.flush();
 
-        // グローバル変数のコード生成
-        gen_data();
+                // トークナイズしてパースする
+                // 結果はcodeに保存される
+                token = Token.tokenize(arg, src);
+                program();
 
-        // 各関数毎にコード生成
-        for (int i = 0; i < code.size(); ++i) {
-            gen_func(code.get(i));
+                // アセンブリの前半部分を出力
+                assemble_code(".intel_syntax noprefix");
+
+                // グローバル変数のコード生成
+                gen_data();
+
+                // 各関数毎にコード生成
+                for (Function func: code) {
+                    gen_func(func);
+                }
+
+                // アセンブリをファイルに出力
+                fw.write(assembly.toString());
+                fw.close();
+
+            } catch (IOException e) {
+                error("%s", e);
+            }
         }
     }
 
@@ -59,7 +84,8 @@ public class App {
     /** エラー位置を出力して終了 */
     public static void error_at(String fmt, Object... values) {
         Token current_line = token.current_line();
-        System.err.printf(" \033[34m-->\033[0m %d:%d\n", token.line(), token.idx() - current_line.idx() + 1);
+        System.err.printf(" \033[34m-->\033[0m %s:%d:%d\n",
+                token.filename(), token.line(), token.idx() - current_line.idx() + 1);
         System.err.println(current_line.str());
         if (0 < (token.idx() - current_line.idx())) {
             System.err.printf("%" + (token.idx() - current_line.idx()) + "s", "");
@@ -67,6 +93,22 @@ public class App {
         System.err.printf("\033[31m%s\033[0m ", String.join("", Collections.nCopies(token.len(), "^")));
         System.err.printf(fmt, values);
         System.exit(1);
+    }
+
+    /** tokenをセットする */
+    public static void set_token(Token new_token) {
+        token = new_token;
+    }
+
+    /** ヘルプメッセージを表示する */
+    private static void help() {
+        System.out.println("Usage: gradle run --args=\"[INPUT]\"");
+    }
+
+    /** assemblyに追加。その際、改行も追記する。*/
+    private static void assemble_code(String fmt, Object... values ) {
+        assembly.append(String.format(fmt, values));
+        assembly.append('\n');
     }
 
     /** パスから文字列を読み込み、一つのStringにして返す */
@@ -78,6 +120,12 @@ public class App {
             error("%s", e);
             return "";
         }
+    }
+
+    /** パスからファイル名のみ抽出し、拡張子を.sにして返す */
+    private static String change_extension(final String path) {
+        String filename = (new File(path)).getName();
+        return filename.replaceFirst("\\.c", ".s");
     }
 
     /**
@@ -850,13 +898,13 @@ public class App {
     /** グローバル変数用 .dataセクション コード生成 */
     private static void gen_data() {
         for (Obj obj: global_st.first()) {
-            System.out.printf("    .data\n");
-            System.out.printf("    .globl %s\n", obj.name());
-            System.out.printf("%s:\n", obj.name());
+            assemble_code("    .data");
+            assemble_code("    .globl %s", obj.name());
+            assemble_code("%s:", obj.name());
             if (obj.type() == Type.Int) {
-                System.out.printf("    .zero %d\n", obj.type().size() * obj.elements());
+                assemble_code("    .zero %d", obj.type().size() * obj.elements());
             } else if (obj.type() == Type.String) {
-                System.out.printf("    .string \"%s\"\n", obj.literal());
+                assemble_code("    .string \"%s\"", obj.literal());
             } else {
                 error("unreachable");
             }
@@ -868,24 +916,24 @@ public class App {
         current_func = func;
 
         // 関数のラベル
-        System.out.printf("    .globl %s\n", func.name());
-        System.out.printf("    .text\n");
-        System.out.printf("%s:\n", func.name());
+        assemble_code("    .globl %s", func.name());
+        assemble_code("    .text");
+        assemble_code("%s:", func.name());
 
         // プロローグ
         // 変数の領域を確保する
-        System.out.println("    push rbp");
-        System.out.println("    mov rbp, rsp");
-        System.out.printf("    sub rsp, %d\n", func.st().offset());
+        assemble_code("    push rbp");
+        assemble_code("    mov rbp, rsp");
+        assemble_code("    sub rsp, %d", func.st().offset());
 
         // レジスタから仮引数へ保存する
         int i = 0;
         for (Token param: func.params()) {
             Obj val = func.st().find_var(param);
             if (val.type().size() == 1) {
-                System.out.printf("    mov [rbp-%d], %s\n", val.offset(), argregs8[i++]);
+                assemble_code("    mov [rbp-%d], %s", val.offset(), argregs8[i++]);
             } else {
-                System.out.printf("    mov [rbp-%d], %s\n", val.offset(), argregs64[i++]);
+                assemble_code("    mov [rbp-%d], %s", val.offset(), argregs64[i++]);
             }
         }
 
@@ -896,10 +944,10 @@ public class App {
 
         // エピローグ
         // 最後の式の結果がRAXに残っているのでそれが返り値になる
-        System.out.printf(".L.return.%s:\n", func.name());
-        System.out.println("    mov rsp, rbp");
-        System.out.println("    pop rbp");
-        System.out.println("    ret");
+        assemble_code(".L.return.%s:", func.name());
+        assemble_code("    mov rsp, rbp");
+        assemble_code("    pop rbp");
+        assemble_code("    ret");
     }
 
     /** 式を左辺値として評価 */
@@ -908,25 +956,25 @@ public class App {
             error("not a variable");
         }
         if (node.variable().is_local()) {
-            System.out.printf("    mov rax, rbp\n");
-            System.out.printf("    sub rax, %d\n", node.offset());
+            assemble_code("    mov rax, rbp");
+            assemble_code("    sub rax, %d", node.offset());
         } else {
-            System.out.printf("    lea rax, %s[rip]\n", node.variable().name());
+            assemble_code("    lea rax, %s[rip]", node.variable().name());
         }
     }
 
     /** 式を左辺値として評価(配列) */
     private static void gen_array(Node node) {
         gen_expr(node.element());
-        System.out.printf("    mov rdx, rax\n");
-        System.out.printf("    imul rdx, %d\n", node.type().size());
+        assemble_code("    mov rdx, rax");
+        assemble_code("    imul rdx, %d", node.type().size());
         if (node.variable().is_local()) {
-            System.out.printf("    mov rax, rbp\n");
-            System.out.printf("    sub rax, %d\n", node.offset());
-            System.out.printf("    sub rax, rdx\n");
+            assemble_code("    mov rax, rbp");
+            assemble_code("    sub rax, %d", node.offset());
+            assemble_code("    sub rax, rdx");
         } else {
-            System.out.printf("    lea rax, %s[rip]\n", node.variable().name());
-            System.out.printf("    add rax, rdx\n");
+            assemble_code("    lea rax, %s[rip]", node.variable().name());
+            assemble_code("    add rax, rdx");
         }
     }
 
@@ -934,32 +982,32 @@ public class App {
     private static void gen_expr(Node node) {
         switch (node.kind()) {
             case Num:
-                System.out.printf("    mov rax, %d\n", node.val());
+                assemble_code("    mov rax, %d", node.val());
                 return;
             case Neg:
                 gen_expr(node.lhs());
-                System.out.println("    neg rax");
+                assemble_code("    neg rax");
                 return;
             case True:
-                System.out.println("    mov rax, 1");
+                assemble_code("    mov rax, 1");
                 return;
             case False:
-                System.out.println("    mov rax, 0");
+                assemble_code("    mov rax, 0");
                 return;
             case Var:
                 gen_val(node);
                 if (node.type().size() == 1) {
-                    System.out.println("    movsx rax, BYTE PTR [rax]");
+                    assemble_code("    movsx rax, BYTE PTR [rax]");
                 } else {
-                    System.out.println("    mov rax, [rax]");
+                    assemble_code("    mov rax, [rax]");
                 }
                 return;
             case Array:
                 gen_array(node);
                 if (node.type().size() == 1) {
-                    System.out.println("    movsx rax, BYTE PTR [rax]");
+                    assemble_code("    movsx rax, BYTE PTR [rax]");
                 } else {
-                    System.out.println("    mov rax, [rax]");
+                    assemble_code("    mov rax, [rax]");
                 }
                 return;
             case Addr:
@@ -972,13 +1020,13 @@ public class App {
                     case Array: gen_array(node.lhs()); break;
                     default: error("invalid assign");
                 }
-                System.out.println("    push rax");
+                assemble_code("    push rax");
                 gen_expr(node.rhs());
-                System.out.println("    pop rdi");  // lhsの結果
+                assemble_code("    pop rdi");  // lhsの結果
                 if (node.lhs().type().size() == 1) {
-                    System.out.println("    mov [rdi], al");
+                    assemble_code("    mov [rdi], al");
                 } else {
-                    System.out.println("    mov [rdi], rax");
+                    assemble_code("    mov [rdi], rax");
                 }
                 return;
             case BlockExpr:
@@ -991,7 +1039,7 @@ public class App {
                 for (Node arg = node.args(); arg != null; arg = arg.next()) {
                     // 実引数の計算結果(rax)をスタックにpushしている
                     gen_expr(arg);
-                    System.out.println("    push rax");
+                    assemble_code("    push rax");
                     ++nargs;
                 }
                 // 6つより多い引数はとりあえず実装しない
@@ -1001,51 +1049,51 @@ public class App {
                 // 引数6以下は専用のレジスタに格納
                 for (int i = nargs - 1; 0 <= i; --i) {
                     // スタックから引数をレジスタにpop
-                    System.out.printf("    pop %s\n", argregs64[i]);
+                    assemble_code("    pop %s", argregs64[i]);
                 }
-                System.out.printf("    mov al, 0\n");
-                System.out.printf("    call %s\n", node.funcname());
+                assemble_code("    mov al, 0");
+                assemble_code("    call %s", node.funcname());
                 return;
         }
 
         gen_expr(node.rhs());
-        System.out.println("    push rax");
+        assemble_code("    push rax");
         gen_expr(node.lhs());
-        System.out.println("    pop rdi");
+        assemble_code("    pop rdi");
 
         switch (node.kind()) {
             case Add:
-                System.out.println("    add rax, rdi");
+                assemble_code("    add rax, rdi");
                 return;
             case Sub:
-                System.out.println("    sub rax, rdi");
+                assemble_code("    sub rax, rdi");
                 return;
             case Mul:
-                System.out.println("    imul rax, rdi");
+                assemble_code("    imul rax, rdi");
                 return;
             case Div:
-                System.out.println("    cqo");
-                System.out.println("    idiv rdi");
+                assemble_code("    cqo");
+                assemble_code("    idiv rdi");
                 return;
             case Eq:
-                System.out.println("    cmp rax, rdi");
-                System.out.println("    sete al");
-                System.out.println("    movzb rax, al");
+                assemble_code("    cmp rax, rdi");
+                assemble_code("    sete al");
+                assemble_code("    movzb rax, al");
                 return;
             case Ne:
-                System.out.println("    cmp rax, rdi");
-                System.out.println("    setne al");
-                System.out.println("    movzb rax, al");
+                assemble_code("    cmp rax, rdi");
+                assemble_code("    setne al");
+                assemble_code("    movzb rax, al");
                 return;
             case Lt:
-                System.out.println("    cmp rax, rdi");
-                System.out.println("    setl al");
-                System.out.println("    movzb rax, al");
+                assemble_code("    cmp rax, rdi");
+                assemble_code("    setl al");
+                assemble_code("    movzb rax, al");
                 return;
             case Le:
-                System.out.println("    cmp rax, rdi");
-                System.out.println("    setle al");
-                System.out.println("    movzb rax, al");
+                assemble_code("    cmp rax, rdi");
+                assemble_code("    setle al");
+                assemble_code("    movzb rax, al");
                 return;
         }
 
@@ -1059,35 +1107,35 @@ public class App {
             case If: {
                 int count = sequence();
                 gen_expr(node.cond());
-                System.out.println("    cmp rax, 0");
-                System.out.printf("    je .L.else.%d\n", count);
+                assemble_code("    cmp rax, 0");
+                assemble_code("    je .L.else.%d", count);
                 gen_stmt(node.then());
-                System.out.printf("    jmp .L.end.%d\n", count);
-                System.out.printf(".L.else.%d:\n", count);
+                assemble_code("    jmp .L.end.%d", count);
+                assemble_code(".L.else.%d:", count);
                 if (node.els() != null) {
                     gen_stmt(node.els());
                 }
-                System.out.printf(".L.end.%d:\n", count);
+                assemble_code(".L.end.%d:", count);
                 return;
             }
             case Do: {
                 int count = sequence();
-                System.out.printf(".L.begin.%d:\n", count);
+                assemble_code(".L.begin.%d:", count);
                 gen_stmt(node.then());
                 gen_expr(node.cond());
-                System.out.println("    cmp rax, 0");
-                System.out.printf("    jne .L.begin.%d\n", count);
+                assemble_code("    cmp rax, 0");
+                assemble_code("    jne .L.begin.%d", count);
                 return;
             }
             case While: {
                 int count = sequence();
-                System.out.printf(".L.begin.%d:\n", count);
+                assemble_code(".L.begin.%d:", count);
                 gen_expr(node.cond());
-                System.out.println("    cmp rax, 0");
-                System.out.printf("    je .L.end.%d\n", count);
+                assemble_code("    cmp rax, 0");
+                assemble_code("    je .L.end.%d", count);
                 gen_stmt(node.then());
-                System.out.printf("    jmp .L.begin.%d\n", count);
-                System.out.printf(".L.end.%d:\n", count);
+                assemble_code("    jmp .L.begin.%d", count);
+                assemble_code(".L.end.%d:", count);
                 return;
             }
             case For: {
@@ -1095,18 +1143,18 @@ public class App {
                 if (node.init() != null) {
                     gen_stmt(node.init());
                 }
-                System.out.printf(".L.begin.%d:\n", count);
+                assemble_code(".L.begin.%d:", count);
                 if (node.cond() != null) {
                     gen_expr(node.cond());
-                    System.out.println("    cmp rax, 0");
-                    System.out.printf("    je .L.end.%d\n", count);
+                    assemble_code("    cmp rax, 0");
+                    assemble_code("    je .L.end.%d", count);
                 }
                 gen_stmt(node.then());
                 if (node.inc() != null) {
                     gen_expr(node.inc());
                 }
-                System.out.printf("    jmp .L.begin.%d\n", count);
-                System.out.printf(".L.end.%d:\n", count);
+                assemble_code("    jmp .L.begin.%d", count);
+                assemble_code(".L.end.%d:", count);
                 return;
             }
             case Block:
@@ -1116,7 +1164,7 @@ public class App {
                 return;
             case Return:
                 gen_expr(node.lhs());
-                System.out.printf("    jmp .L.return.%s\n", current_func.name());
+                assemble_code("    jmp .L.return.%s", current_func.name());
                 return;
             case ExprStmt:
                 gen_expr(node.lhs());

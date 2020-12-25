@@ -1,9 +1,12 @@
 package jaian;
 
+import java.io.File;
+
 /** トークン型 */
 public class Token {
-    private static String src;    /** 入力文字列 */
-    private static int __LINE__;  /** 現在の行数 */
+    private static String filename;  /** ファイル名 */
+    private static String src;       /** 入力文字列 */
+    private static int __LINE__;     /** 現在の行数 */
 
     private TokenKind kind;  /** トークンの型 */
     private Token prev;      /** 前のトークン */
@@ -15,7 +18,8 @@ public class Token {
     /** Tokenクラスの初期化 */
     public Token() {}
     /** 入力文字列をトークナイズしてそれを返す */
-    public static Token tokenize(String src) {
+    public static Token tokenize(String path, String src) {
+        Token.filename = (new File(path)).getName();
         Token.src = src;
         Token head = new Token();
         Token cur = head;
@@ -130,8 +134,8 @@ public class Token {
                 continue;
             }
 
-            Token current_line = new_token(TokenKind.EOF, cur, idx, 1).current_line();
-            App.error("%d:%d: invalid character: \"%s\"", __LINE__, idx - current_line.idx(), ch);
+            App.set_token(new_token(TokenKind.Invalid, cur, idx, 1));
+            App.error_at("invalid character: '%c'", ch);
         }
 
         new_token(TokenKind.EOF, cur, idx, 0);
@@ -159,7 +163,7 @@ public class Token {
     public Token current_line() {
         int begin = this.idx;
         int end   = this.idx;
-        while (0 <= begin-1 && src.charAt(begin-1) != '\n') {
+        while (0 < begin-1 && src.charAt(begin-1) != '\n') {
             --begin;
         }
         while (end+1 < src.length() && src.charAt(end+1) != '\n') {
@@ -189,13 +193,14 @@ public class Token {
     }
 
     // Getters
-    public String src()     { return this.src; }
-    public TokenKind kind() { return this.kind; }
-    public Token prev()     { return this.prev; }
-    public Token next()     { return this.next; }
-    public int idx()        { return this.idx; }
-    public int len()        { return this.len; }
-    public int line()       { return this.line; }
+    public String filename() { return this.filename; }
+    public String src()      { return this.src; }
+    public TokenKind kind()  { return this.kind; }
+    public Token prev()      { return this.prev; }
+    public Token next()      { return this.next; }
+    public int idx()         { return this.idx; }
+    public int len()         { return this.len; }
+    public int line()        { return this.line; }
 
     /** 空白文字ならtrueを返す */
     private static boolean is_whitespace(char c) {
