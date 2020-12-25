@@ -139,6 +139,16 @@ int main() {
     assert_eq( 5, { char x[10]; x[5]=5; x[5]; });
     assert_eq(11, { char x=5; int a=7; char y=6; int b=8; x+y; });
     assert_eq(15, { char x=5; int a=7; char y=6; int b=8; a+b; });
+    assert_eq(97, 'a');
+    assert_eq(48, '0');
+    assert_eq( 8, '\b');
+    assert_eq( 9, '\t');
+    assert_eq(10, '\n');
+    assert_eq(12, '\f');
+    assert_eq(13, '\r');
+    assert_eq(39, '\'');
+    //assert_eq(92, '\\');
+    assert_eq( 2, { char a='a'; int b=97; if(a==(char)b){a=2;}else{a=3;} a;});
 
     // scope
     assert_eq(6, ({ int a=2,b; { int a=4; b=a; } a+b; }));

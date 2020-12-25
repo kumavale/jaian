@@ -91,6 +91,18 @@ public class Token {
                 continue;
             }
 
+            // Charリテラル
+            if (ch == '\'') {
+                int begin = idx;
+                while (src.charAt(++idx) != '\'' || src.charAt(idx-1) == '\\');  // '\\' not support
+                if (idx - begin == 2 || (idx - begin == 3 && src.charAt(begin+1) == '\\')) {
+                    cur = new_token(TokenKind.Ch, cur, begin, idx - begin + 1);
+                    continue;
+                }
+                App.set_token(new_token(TokenKind.Invalid, cur, begin, idx - begin + 1));
+                App.error_at("character literal may only contain one codepoint");
+            }
+
             // 識別子 もしくは 予約語
             // アルファベットから始まり、アルファベットか数字かアンダースコアが続く
             if (Character.isAlphabetic(ch)) {
@@ -174,7 +186,27 @@ public class Token {
 
     /** 整数を返す */
     public int val() {
-        return Integer.parseInt(this.str());
+        switch (this.kind) {
+            case Num: return Integer.parseInt(this.str());
+            case Ch:
+                String str = this.str();
+                if (str.length() == 3) {
+                    return str.charAt(1);
+                } else {
+                    switch (str.charAt(2)) {
+                        case 'b':  return  8;
+                        case 't':  return  9;
+                        case 'n':  return 10;
+                        case 'f':  return 12;
+                        case 'r':  return 13;
+                        case '\'': return 39;
+                        case '\\': return 92;
+                    }
+                }
+        }
+        // unreachable
+        App.error_at("Token.java: val(): Not a number");
+        return 0;
     }
 
     /** tokenがEOFかどうか */

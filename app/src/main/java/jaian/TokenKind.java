@@ -4,8 +4,9 @@ package jaian;
 public enum TokenKind {
     Ident,    /** 識別子 */
     String,   /** 文字列リテラル */
-    Punct,    /** 区切り文字 */
+    Ch,       /** charリテラル */
     Num,      /** 整数 */
+    Punct,    /** 区切り文字 */
     EOF,      /** 入力の終わり */
     Invalid,  /** 無効なトークン */
 

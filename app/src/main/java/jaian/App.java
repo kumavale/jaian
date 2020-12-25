@@ -232,7 +232,7 @@ public class App {
      * それ以外の場合にはエラーを報告する。
      */
     private static int expect_number() {
-        if (token.kind() != TokenKind.Num) {
+        if (token.kind() != TokenKind.Num && token.kind() != TokenKind.Ch) {
             error_at("Not a number: \"%s\"", token.str());
         }
         int val = token.val();
